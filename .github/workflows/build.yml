@@ -1,0 +1,108 @@
+name: Build portable tools and APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  portable:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+        build-type: [debug, release]
+        include:
+          - os: windows-latest
+            targets: windows-x64 android
+          - os: ubuntu-22.04
+            targets: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: build/downloads
+          key: portable-${{ matrix.os }}-${{ hashFiles('scripts/runtime-lock.json') }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.bat' } else { '' }
+          Set-Content -LiteralPath local.properties -Value "sdk.dir=$($env:ANDROID_HOME.Replace('\', '/'))" -Encoding utf8NoBOM
+          & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager$suffix" 'platforms;android-37.0' 'build-tools;36.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK setup failed' }
+      - name: Build
+        run: python scripts/build.py --targets ${{ matrix.targets }} --build-type ${{ matrix.build-type }}
+      - name: Linux portable smoke test
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p build/smoke
+          tar -xzf build/dist/${{ matrix.build-type }}/*-linux-x64.tar.gz -C build/smoke
+          build/smoke/Set-for-U/Set-for-U --version
+          build/smoke/Set-for-U/Set-for-U --self-test
+          build/smoke/Set-for-U/tools/adb version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Set-for-U-${{ runner.os }}-${{ matrix.build-type }}
+          path: build/dist/${{ matrix.build-type }}/*
+
+  avd:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [23, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - name: Prepare build and test dependencies
+        run: |
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+          sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
+          python scripts/prepare-avd-tests.py
+          sh gradlew -p buildSrc test --no-daemon --console=plain
+          sh gradlew :testTarget:assembleDebug :android:assembleDebug :android:assembleDebugAndroidTest :desktop:testClasses --no-daemon --console=plain
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            pwsh -NoProfile -File scripts/Test-Bridges.ps1 -Serial emulator-5554 -TargetPackage com.napreth.set4u.testtarget -TargetApk test-fixtures/target/build/outputs/apk/debug/testTarget-debug.apk -ShizukuApk build/downloads/shizuku-v13.6.0.r1086.2650830c-release.apk
+            if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-network-ui.py --serial emulator-5554 --radios; fi
+            if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-themes-ui.py --serial emulator-5554; fi
+            if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-app-ui.py --serial emulator-5554; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: avd-api-${{ matrix.api }}
+          path: |
+            build/reports/bridge-avd/
+            build/reports/network-ui/
+            build/reports/themes-ui/
+            build/reports/app-ui/
+            set4u/core/build/test-results/
+            set4u/desktop/build/test-results/
+            buildSrc/build/test-results/

@@ -1,0 +1,23 @@
+# IDE
+.vscode
+.idea
+local.properties
+
+# Gradle
+.gradle
+.kotlin/
+
+# Build artifacts
+build
+!buildSrc/src/**/build/
+!buildSrc/src/**/build/**/*.java
+output
+bin/
+*.class
+*.dex
+*.hprof
+__pycache__/
+*.pyc
+
+# Log
+*.log

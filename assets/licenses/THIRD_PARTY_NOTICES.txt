@@ -1,0 +1,35 @@
+Set-for-U UI dependencies
+
+Compose Multiplatform 1.11.1 / Material 3 1.9.0
+Copyright JetBrains s.r.o., The Android Open Source Project and contributors
+Apache-2.0 — https://github.com/JetBrains/compose-multiplatform
+
+Compose Cupertino 2.3.1
+Copyright 2023-2024 Compose Cupertino project and open source contributors
+Copyright 2025 Scott Lanoue
+Apache-2.0 — https://github.com/slanos/compose-cupertino
+
+Miuix 0.8.5
+Copyright compose-miuix-ui contributors
+Apache-2.0 — https://github.com/compose-miuix-ui/miuix
+
+Backdrop 2.0.0-alpha02 / Shapes (transitive dependency)
+Copyright Kyant and contributors
+Apache-2.0 — https://github.com/Kyant0/AndroidLiquidGlass
+https://github.com/Kyant0/Shapes
+
+Skiko 0.144.6
+Copyright JetBrains s.r.o. and contributors
+Apache-2.0 — https://github.com/JetBrains/skiko
+Skiko license: Skiko-LICENSE.txt
+Skia license: Skia-LICENSE.txt
+Skia and its bundled third-party components retain their own licenses.
+
+The Apache 2.0 license is included as Apache-2.0.txt.
+These community libraries are independent of Set-for-U, Apple, Xiaomi and OPPO.
+Set-for-U's own code is licensed under the MIT License.
+
+COUI 1.1.0 (coui-ui, coui-core, coui-squircle)
+Copyright 2024-2026 compose-coui-ui contributors
+https://github.com/suqi8/coui
+Apache License 2.0; see Apache-2.0.txt.
