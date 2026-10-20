@@ -34,15 +34,15 @@ internal class ComponentSettingsFixture {
     val cache = MemorySetting(SettingValue.TextValue("1.00 GB"), SettingAccess.ReadOnly)
     val input = MemorySetting(SettingValue.IntegerValue(5))
     var clearCalls = 0
-    val notificationDefinition = SettingDefinition("application.notifications", ValueType.Boolean, notifications)
-    val backgroundDefinition = SettingDefinition("application.background", ValueType.Choice, background, choices = listOf("allowed", "optimized", "restricted"))
-    val channelDefinition = SettingDefinition("application.channels", ValueType.MultiChoice, channels, choices = listOf("messages", "updates", "promotions"))
-    val inputDefinition = SettingDefinition("application.timeout", ValueType.Integer, input, minimum = 1, maximum = 60)
-    val clearDefinition = SettingDefinition("application.clearCache", ValueType.Action, object : SettingHandler {
+    val notificationDefinition = SettingDefinition("application.notifications", ValueType.Boolean, { notifications })
+    val backgroundDefinition = SettingDefinition("application.background", ValueType.Choice, { background }, choices = listOf("allowed", "optimized", "restricted"))
+    val channelDefinition = SettingDefinition("application.channels", ValueType.MultiChoice, { channels }, choices = listOf("messages", "updates", "promotions"))
+    val inputDefinition = SettingDefinition("application.timeout", ValueType.Integer, { input }, minimum = 1, maximum = 60)
+    val clearDefinition = SettingDefinition("application.clearCache", ValueType.Action, { object : SettingHandler {
         override suspend fun inspect(context: SettingContext) = cache.inspect(context).copy(access = SettingAccess.Writable)
         override suspend fun apply(context: SettingContext, desiredValue: SettingValue) { clearCalls++; cache.value = SettingValue.TextValue("0 B") }
         override fun verify(before: SettingSnapshot, after: SettingSnapshot, desiredValue: SettingValue) = if (after.value == SettingValue.TextValue("0 B")) Verification.Satisfied else Verification.NotSatisfied(FailureReason("Cache was not cleared"))
-    })
+    } })
     val notificationEntry = SettingEntry(notificationDefinition, UiText.Literal("通知"))
     val backgroundEntry = SettingEntry(backgroundDefinition, UiText.Literal("耗电行为控制"), choices = listOf(
         EntryChoice("allowed", UiText.Literal("完全允许后台行为"), UiText.Literal("不限制应用的任何后台行为")),

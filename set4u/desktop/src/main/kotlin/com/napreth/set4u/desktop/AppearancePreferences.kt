@@ -15,6 +15,8 @@ internal class AppearancePreferences(private val file: Path = defaultFile()) {
     fun readThemeMode() = ThemeMode.fromId(properties().getProperty("themeMode"))
     fun readLanguage() = AppLanguage.fromId(properties().getProperty("language"))
     fun readWorkMode() = if (properties().getProperty("workMode") == "root") WorkMode.Root else WorkMode.Shell
+    fun readOwnPages() = properties().getProperty("ownPages").toBoolean()
+    fun writeOwnPages(enabled: Boolean) = writeProperty("ownPages", enabled.toString())
     fun readRootShell() = properties().getProperty("rootShell").toBoolean()
     fun write(theme: AppTheme) = writeProperty("theme", theme.id)
     fun writeThemeMode(mode: ThemeMode) = writeProperty("themeMode", mode.id)

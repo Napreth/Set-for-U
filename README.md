@@ -29,13 +29,19 @@ vm.dispatch(SettingsEvent.ChangeValue(row.id, SettingValue.BooleanValue(true), r
 
 SettingsPage.layout 安排容器与 Row，onEnter 查询已声明的 Entry。页面先显示，再逐项读取。EntryStyle 可以让同一条目显示为下拉行、选择行或只读信息。页面私有样式通过 SettingRow.rendererKey 表达，平台没有专用渲染器时仍能使用标准 control。
 
-DynamicSettingEntry 接收 Flow<EntrySnapshot>。每个快照包含递增 revision、Row 和可选有效期。没有结果时，由具体 Entry 或页面选择显示提示或隐藏结果条目，框架不自动填充占位 Row。动态行参数放在 EntryRow 的 RowRequest 中，界面只提交 Row ID、意图和 token。列表更新、页面重建、离开页面或资源过期后，旧动态行不能再提交；已经排队的请求也会在执行前重新检查。动态数据源随可见页面取消，不会变成常驻扫描服务。Wi-Fi 的三网络示例见 DynamicEntriesTest，当前产品页的扫描和连接仍使用系统入口，没有展示测试 SSID。
+DynamicSettingEntry 接收 Flow<EntrySnapshot>。每个快照包含递增 revision、Row 和可选有效期。没有结果时，由具体 Entry 或页面选择显示提示或隐藏结果条目，框架不自动填充占位 Row。动态行参数放在 EntryRow 的 RowRequest 中，界面只提交 Row ID、意图和 token。列表更新、页面重建、离开页面或资源过期后，旧动态行不能再提交；已经排队的请求也会在执行前重新检查。动态数据源随可见页面取消，不会变成常驻扫描服务。Wi-Fi 的三网络示例见 DynamicEntriesTest，WLAN、蓝牙和热点在实际执行身份为 root 时使用内置页面，展示真实设备数据；非 root 默认打开系统对应页面。
 
 操作经 SettingsService 校验后进入执行引擎，完成 inspect、check、prepare、apply、inspect、verify 和必要的 explain。prepare 重新检查执行资格，页面不负责设置后的验证。实际观测与请求目标分开保存，读取失败不会被当作关闭。
 
-文案位于独立资源表，业务定义不会随语言改变。构建任务 exportUiMetadata 从 Entry 的声明元数据导出全部语言、稳定设置索引及搜索词，随 APK 和桌面 JAR 打包，不收集动态 SSID。session.search.search(query, locale) 跨语言匹配 Entry，再按设备能力过滤；诊断场景可以显式保留不支持的结果。
+普通查询也可实现 Handler，通过 HandlerDefinition 注册并由 session.handlers.invoke 调用，自定义方法可以直接返回结构化数据。它与设置操作共用调度、超时、取消和执行证据；SettingHandler 仍走 SettingsService 的校验与回读流程。所有实现均使用工厂，实例不会跨操作或会话共享。页面和动态 Entry 的查询入口只接受只读 Handler。
+
+文案位于独立资源表，业务定义不会随语言改变。构建任务 exportUiMetadata 从 Entry 和 NavigationEntry 导出全部语言、稳定设置索引及搜索词，随 APK 和桌面 JAR 打包，不收集动态 SSID。首页搜索框使用 session.search.search(query, locale)，跨语言匹配后按设备和页面能力过滤；热点、VPN 和证书等纯跳转入口也可搜索，不需要虚构设置定义。
 
 兼容包区分 DeviceSupport 与 OperationAvailability。设备确实没有硬件、缺少当前权限、需要 root、需要系统跳转和探测失败分别表达。页面通过 UnsupportedVisibility 决定是否隐藏确认不支持的 Row；权限不足和未知状态不会自动隐藏。静态 ROM/API 规则继续选择具名后端，SupportProbe 补充运行时事实。
+
+CompatibilityEvidence 保存声明、扫描和实时探测的来源、作用域、时间与证明类型。ResolutionPolicy 决定按哪种策略解析证据，ResolutionRule 可按设备、身份、UID、目标包和用户覆盖策略。前置条件满足不能证明行为可成功，也不能覆盖已知操作限制。session.scanner.scan(target) 只运行只读探测，其他测试记为 NotTested，返回结构化报告；主动测试和兼容规则发布尚未实现。
+
+页面可实现 AvailabilityProbe。不同跳转行共享本轮检测结果，按自己的策略隐藏、置灰或保留入口，进入页面后重新检测。共享界面支持页面私有 Row 渲染器、惰性列表、加载错误和提交拒绝反馈。
 
 ## 构建
 
@@ -47,11 +53,11 @@ DynamicSettingEntry 接收 Flow<EntrySnapshot>。每个快照包含递增 revisi
 .\gradlew.bat :core:test :desktop:test :android:assembleDebug
 ```
 
-Core 测试也可以单独运行 `./gradlew :core:test`，需要 SDK 构建设备 DEX，但不需要连接设备。Android 和 Desktop 使用共享 Compose 页面，首页提供“网络与通信”，应用外观放在“关于”。WLAN、移动数据、蓝牙、NFC、飞行模式和私人 DNS 通过执行引擎读取、修改与回读验证；热点、VPN、代理与证书暂用系统界面，eSIM 放在移动数据子页。任务声明、构建产物和测试方式见 [BUILDING.md](BUILDING.md)。
+Core 测试也可以单独运行 `./gradlew :core:test`，需要 SDK 构建设备 DEX，但不需要连接设备。Android 和 Desktop 使用共享 Compose 页面，首页提供“网络与通信”，应用外观放在“关于”。WLAN、移动数据、蓝牙、NFC、飞行模式和私人 DNS 通过执行引擎读取、修改与回读验证；VPN、APN、SIM 管理与证书暂用系统界面，eSIM 放在移动数据子页。任务声明、构建产物和测试方式见 [BUILDING.md](BUILDING.md)。
 
 设备任务使用 [DeviceTask.kt](set4u/core/src/main/kotlin/com/napreth/set4u/core/device/DeviceTask.kt) 中的抽象基类，以带 @DeviceEntry 的具体类作为入口。主机只引用 DeviceTaskDescriptor，设备端通过注册表校验协议、编解码并创建任务实例。[DeviceTaskTest.kt](set4u/core/src/test/kotlin/com/napreth/set4u/core/device/DeviceTaskTest.kt) 验证类注册、请求隔离、取消和错误处理；DEX 已随 APK 和桌面包构建；Session 内按构建版本与 SHA-256 缓存已校验的产物，每次调用仍启动独立设备进程，会话关闭时清理缓存。多语言索引已经接入构建；厂商后端按实际功能继续扩充。
 
-“关于 → 应用设置 → 界面风格”可以切换 Google Material、Apple Cupertino、HyperOS Miuix、ColorOS COUI。两端分别使用 Material 3、Compose Cupertino、Miuix、COUI 的组件，共用页面和交互。Cupertino 的悬浮玻璃底栏使用 Compose Backdrop，低版本 Android 自动降级。同组还可下拉选择跟随系统／浅色／深色主题，以及跟随系统／简体中文／English 应用语言。配置保存在本机，切换保留页面与设备会话。版本和平台限制见 [BUILDING.md](BUILDING.md)。
+“关于 → 外观 → 界面风格”可以切换 Google Material、Apple Cupertino、HyperOS Miuix、ColorOS COUI。两端分别使用 Material 3、Compose Cupertino、Miuix、COUI 的组件，共用页面和交互。Cupertino 的悬浮玻璃底栏使用 Compose Backdrop，低版本 Android 自动降级。外观页还可下拉选择跟随系统／浅色／深色主题，应用语言仍在关于首页选择。配置保存在本机，切换保留页面与设备会话。版本和平台限制见 [BUILDING.md](BUILDING.md)。
 
 ## Bridge
 
@@ -59,7 +65,7 @@ ADB、Shizuku 和 Local 是传输通道，Shell、Root、App 和 System 是执�
 
 工作模式通过下拉菜单选择，“设备信息”进入独立页面。安卓端查看本机基本信息不需要额外授权，桌面端显示已连接设备的信息。
 
-工作模式、状态、授权操作各占一行，授权一行右侧使用文字操作。失败直接在状态中显示原因，下面可重试。root 模式还可开启“以 root 模拟 shell 身份”，使用 UID 2000 执行命令；切换会重建会话并重新判断能力，配置保存在本机。此模式需要 root 授权，不能替代授权。
+工作模式、状态、授权操作各占一行，授权一行右侧使用文字操作。失败直接在状态中显示原因，下面可重试。“关于 → 调试”中可开启“以 root 模拟 shell 身份”，非 root 工作模式下置灰；同页可用“始终使用内置设置页”覆盖默认系统跳转。开启模拟 shell 后使用 UID 2000 执行命令；切换会重建会话并重新判断能力，配置保存在本机。此模式需要 root 授权，不能替代授权。
 
 
 Desktop 的 `AdbBridge(serial)` 固定绑定一台设备，`connect()` 检查连接及授权。命令通过本地 ADB server 的 shell-v2 协议执行，保留原始字节、独立 stderr 和退出码；设备发现、连接检查与文件 push/pull 使用本机 adb。adb 需要位于 PATH，也可以通过构造参数提供可执行文件、server 地址和端口。
@@ -106,3 +112,12 @@ $env:ANDROID_AVD_HOME = (Resolve-Path .\build\avd).Path
 ```
 
 在具备 su 的自有 userdebug AVD 上，可显式设置 SET4U_TEST_ROOT=1，再执行 Test-Bridges.ps1，追加运行 RootBridge 的同一份 Contract。默认构建和 CI 不会请求 root。普通 Google APIs AVD 的 su 允许 shell 调用，并不等于允许普通应用调用；Android 本机 su 授权还需要在有相应 root 管理器的设备上验证。
+
+
+root 无线管理使用 WirelessQuery 读取结构化数据，WirelessTask 在独立设备进程中调用 Android API。Wi-Fi 支持扫描、开放及个人密码网络连接、已保存网络重连和忘记、断开及连接信息；企业网络配置保留系统入口。蓝牙支持经典蓝牙与 BLE 扫描、配对和取消配对、已配对设备连接与断开、设备重命名。热点使用 TetheringManager 启停实际共享，提供 WLAN、USB、蓝牙共享及 WLAN 热点名称、密码和频段配置。硬件、系统版本和厂商服务仍可能限制具体操作，实际结果由回读决定。
+
+WLAN 首页把当前连接与扫描结果放在同一组，以副标题显示已连接或已保存；同名但安全类型不同的网络分别保留。自动开启、公共网络通知、证书和直连入口直接放在首页，WEP 与后台扫描开关放在高级 WLAN 设置里。
+
+网络详情提供自动连接、多用户共享、修改权限、计费方式、MAC 隐私、隐藏网络、密码、代理与 DHCP/静态 IP 配置，以及二维码分享。修改走执行引擎并回读系统配置；静态 IP 切换还检查实际连接地址。网关、DNS、IPv6、收发速率和 MAC 地址从当前 WLAN 的 LinkProperties/WifiInfo 读取。缺少接口或硬件能力的选项会隐藏或禁用，例如 AVD 不支持连接时的 MAC 随机化。证书安装与 WLAN 直连使用系统处理页面。
+
+普通页面不显示顶部加载条。静态条目不再重复启动数据源检查，基础设备事实在 Session 内复用，独立采集命令并发执行；打开网络首页也不会预读移动数据子页。页面刷新仍读取当前设置值，修改前的身份与权限检查不使用展示缓存。

@@ -8,14 +8,16 @@ import java.util.Collections
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-abstract class SettingsPage(val id: String, val title: UiText) {
+abstract class SettingsPage(val id: String, val title: UiText) : com.napreth.set4u.core.compatibility.AvailabilityProbe {
     constructor(id: String, title: String) : this(id, UiText.Literal(title))
     init { require(id.isNotBlank()) }
     abstract val entries: List<SettingEntry>
     abstract fun layout(rows: PageRows): List<RowContainer>
     open val resources: List<UiText> = emptyList()
+    open val navigationEntries: List<NavigationEntry> = emptyList()
+    override suspend fun assess(context: com.napreth.set4u.core.compatibility.AvailabilityContext) = com.napreth.set4u.core.compatibility.AvailabilityAssessment()
     open suspend fun onEnter(context: SettingsPageContext) { context.readAll() }
-    internal fun snapshot() = SettingsPageSnapshot(id, title, Collections.unmodifiableList(ArrayList(entries)), ::layout)
+    internal fun snapshot() = SettingsPageSnapshot(id, title, Collections.unmodifiableList(ArrayList(entries)), ::layout, Collections.unmodifiableList(navigationEntries.map { it.frozen() }))
 }
 
 enum class PageLoadReason { Enter, Refresh }
@@ -23,6 +25,7 @@ class SettingsPageContext internal constructor(
     val target: SettingTarget,
     val reason: PageLoadReason,
     val settings: List<SettingDefinition>,
+    val handlers: com.napreth.set4u.core.execution.HandlerQueries,
     private val reader: suspend (SettingDefinition) -> SettingObservation,
 ) {
     suspend fun read(settingId: String): SettingObservation {
@@ -38,6 +41,7 @@ class SettingsPageSnapshot internal constructor(
     val title: UiText,
     val entries: List<SettingEntry>,
     internal val layout: (PageRows) -> List<RowContainer>,
+    val navigationEntries: List<NavigationEntry> = emptyList(),
 ) {
     val settings = Collections.unmodifiableList(entries.map { it.setting }.distinctBy { it.id })
     init { require(entries.map { it.id }.distinct().size == entries.size) { "Duplicate page entry in $id" } }
@@ -56,13 +60,17 @@ class PageRows internal constructor(
 ) {
     internal val bindings = linkedMapOf<String, EntryBinding>()
     fun text(value: UiText) = texts.resolve(value, locale)
+    fun navigation(id: String, value: SettingEntry? = null): NavigationRow = navigation(page.navigationEntries.firstOrNull { it.id == id } ?: error("Undeclared navigation entry: $id"), value)
+    fun navigation(entry: NavigationEntry, value: SettingEntry? = null): NavigationRow = navigation(entry.id, entry.title, entry.destination, value, entry.icon).copy(
+        summary = text(entry.summary), availabilityPolicy = entry.availabilityPolicy,
+    )
     fun rows(entry: SettingEntry, style: EntryStyle = EntryStyle.Default, instance: String? = null,
              unsupported: UnsupportedVisibility = UnsupportedVisibility.Show): List<Row> {
         require(page.entries.any { it === entry }) { "Undeclared page entry: ${entry.id}" }
         if (unsupported == UnsupportedVisibility.Hide && status(entry.setting.id).observation?.snapshot?.capability?.support is com.napreth.set4u.core.compatibility.DeviceSupport.Unsupported) return emptyList()
         val frame = frames[entry.id] ?: EntrySnapshot(0)
         val manual = status(entry.setting.id).observation?.snapshot?.capability?.operation as? com.napreth.set4u.core.compatibility.OperationAvailability.Manual
-        if (manual != null) {
+        if (manual != null && entry !is HandlerSettingEntry) {
             val id = instance ?: entry.id
             bind(id, entry, RowRequest.ReadOnly, frame)
             return listOf(NavigationRow(id, text(entry.title), SettingsDestination(systemScreen = manual.destination)))

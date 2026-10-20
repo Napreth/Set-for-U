@@ -8,17 +8,17 @@ import com.napreth.set4u.core.settings.*
 import com.napreth.set4u.core.state.SettingSnapshot
 
 object NetworkSettings {
-    val wifi = SettingDefinition("network.wifi.enabled", ValueType.Boolean, WifiHandler())
+    val wifi = SettingDefinition("network.wifi.enabled", ValueType.Boolean, { WifiHandler() })
     val mobileData = SettingDefinition("network.mobile_data.enabled", ValueType.Boolean,
         operationFunctions = mapOf("telephony31" to { MobileDataHandler() }))
     val bluetooth = SettingDefinition("network.bluetooth.enabled", ValueType.Boolean,
         operationFunctions = mapOf("manager31" to { BluetoothHandler() }))
     val nfc = SettingDefinition("network.nfc.enabled", ValueType.Boolean,
         operationFunctions = mapOf("shell35" to { NfcHandler() }))
-    val airplane = SettingDefinition("network.airplane.enabled", ValueType.Boolean, AirplaneHandler())
-    val dnsMode = SettingDefinition("network.private_dns.mode", ValueType.Choice, DnsModeHandler(),
+    val airplane = SettingDefinition("network.airplane.enabled", ValueType.Boolean, { AirplaneHandler() })
+    val dnsMode = SettingDefinition("network.private_dns.mode", ValueType.Choice, { DnsModeHandler() },
         choices = listOf("off", "opportunistic", "hostname"))
-    val dnsHostname = SettingDefinition("network.private_dns.hostname", ValueType.Text, DnsHostnameHandler(),
+    val dnsHostname = SettingDefinition("network.private_dns.hostname", ValueType.Text, { DnsHostnameHandler() },
         maxLength = 253)
     val definitions = listOf(wifi, airplane, dnsMode, dnsHostname, mobileData, bluetooth, nfc)
 }

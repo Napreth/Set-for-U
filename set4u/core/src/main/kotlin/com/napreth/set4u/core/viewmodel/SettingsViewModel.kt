@@ -28,6 +28,7 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
     private var loadJob: Job? = null
     private var pageJobs: Job? = null
     private var entered = false
+    private val navigationAvailability = mutableMapOf<String, com.napreth.set4u.core.compatibility.AvailabilityAssessment>()
     private val token = UUID.randomUUID().toString()
 
     @Synchronized fun enter(): Job {
@@ -41,27 +42,39 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
         requireOpen()
         val version = generation.incrementAndGet()
         loadJob?.cancel(); pageJobs?.cancel()
-        synchronized(renderLock) { bindings = emptyMap(); frames.clear() }
-        mutableState.update { it.copy(isLoading = true, error = null) }
+        synchronized(renderLock) { bindings = emptyMap(); frames.clear(); navigationAvailability.clear() }
+        mutableState.update { it.copy(isLoading = true, error = null, rejection = null, availability = null) }
         return scope.launch {
             try {
-                if (reason == PageLoadReason.Refresh) session.compatibility.invalidate()
                 val loaded = session.settings.loadPage(target, pageId)
                 currentCoroutineContext().ensureActive()
                 if (!isCurrent(version)) return@launch
                 synchronized(renderLock) { page = loaded.page; publish(version) }
+                val cycle = session.pages.cycle(this)
+                val availability = cycle.assessLoaded(pageId, target, loaded.probe)
+                if (!isCurrent(version)) return@launch
+                mutableState.update { it.copy(availability = availability) }
+                if (availability.status != com.napreth.set4u.core.compatibility.AvailabilityStatus.Available) return@launch
+                state.value.items.mapNotNull { it.component as? NavigationRow }.filter {
+                    it.destination.systemScreen == null && it.availabilityPolicy != NavigationAvailabilityPolicy.IgnorePage
+                }.map { row -> async {
+                    val result = cycle.assess(row.destination.pageId, row.destination.target ?: target)
+                    if (isCurrent(version)) synchronized(renderLock) { navigationAvailability[row.id] = result; publish(version) }
+                } }.awaitAll()
                 val observers = SupervisorJob(scope.coroutineContext[Job]).also { pageJobs = it }
                 scope.launch(observers) {
                     session.observeSettings(loaded.page.settings.map { key(it.id) }.toSet()).collect {
                         if (isCurrent(version)) synchronized(renderLock) { publish(version) }
                     }
                 }
-                loaded.page.entries.forEach { entry -> scope.launch(observers) {
+                loaded.page.entries.filter { it.dynamic || it.javaClass != SettingEntry::class.java }.forEach { entry -> scope.launch(observers) {
                     var last: Long? = null
                     try {
                         // Dynamic sources must not run merely because a page contains their entry.
-                        if (session.compatibility.assess(entry.setting).operation !is com.napreth.set4u.core.compatibility.OperationAvailability.Direct) return@launch
-                        entry.observe(target).collect { frame ->
+                        val assessment = if (entry is HandlerSettingEntry) session.compatibility.assess(entry.sourceCapability, target, com.napreth.set4u.core.compatibility.AssessmentPurpose.PageLoad)
+                            else session.compatibility.assess(entry.setting, target, com.napreth.set4u.core.compatibility.AssessmentPurpose.PageLoad)
+                        if (assessment.operation !is com.napreth.set4u.core.compatibility.OperationAvailability.Direct) return@launch
+                        entry.observe(EntryContext(target, session.handlers.queries)).collect { frame ->
                             currentCoroutineContext().ensureActive()
                             if (!isCurrent(version)) return@collect
                             require(last == null || frame.revision > checkNotNull(last)) { "Entry revisions must increase: ${entry.id}" }
@@ -76,7 +89,7 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
                         }
                     }
                 } }
-                loaded.onEnter(SettingsPageContext(target, reason, loaded.page.settings) { definition ->
+                loaded.onEnter(SettingsPageContext(target, reason, loaded.page.settings, session.handlers.queries) { definition ->
                     currentCoroutineContext().ensureActive()
                     check(isCurrent(version)) { "Stale page load" }
                     session.settings.read(target, definition)
@@ -106,7 +119,7 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
         val ids = mutableSetOf<String>()
         val containers = raw.mapNotNull { container ->
             require(container.id.isNotBlank())
-            val items = container.rows.map { row ->
+            val items = container.rows.mapNotNull { row ->
                 require(row.id.isNotBlank() && row.title.isNotBlank() && ids.add(row.id)) { "Duplicate or invalid row: ${row.id}" }
                 if (row is NavigationRow) session.catalog.validateDestination(row.destination)
                 val frozen = when (row) {
@@ -115,7 +128,9 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
                 }
                 val binding = rows.bindings[row.id]
                 require(row !is SettingRow || row.control == RowControl.Value || binding != null) { "Editable row has no entry: ${row.id}" }
-                SettingUiItem(frozen, binding?.token ?: "$token:$version:${row.id}", binding?.let { status(it.entry.setting.id) } ?: SettingStatus(), binding != null)
+                val availability = navigationAvailability[row.id]
+                if (row is NavigationRow && row.availabilityPolicy == NavigationAvailabilityPolicy.FollowPage && availability?.status == com.napreth.set4u.core.compatibility.AvailabilityStatus.Unsupported) null
+                else SettingUiItem(frozen, binding?.token ?: "$token:$version:${row.id}", binding?.let { status(it.entry.setting.id) } ?: SettingStatus(), binding != null, availability)
             }
             if (items.isEmpty()) null else SettingUiContainer(container.copy(rows = Collections.unmodifiableList(items.map { it.component })), Collections.unmodifiableList(items))
         }
@@ -135,6 +150,7 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
         val ui = state.value.find(id) ?: return reject("Row is not visible: $id")
         if (suppliedToken != null && suppliedToken != ui.token) return reject("Stale row: $id")
         if (ui.component is NavigationRow) {
+            if (!ui.isEnabled) return reject(ui.availability?.reason ?: "Page is unavailable")
             val destination = ui.component.destination
             val effect = destination.systemScreen?.let { SettingsEffect.OpenSystemSettings(it, destination.target ?: target) } ?: SettingsEffect.Navigate(destination.pageId, destination.target ?: target)
             effectChannel.trySend(effect); return null
@@ -174,11 +190,15 @@ class SettingsViewModel internal constructor(private val session: CoreSession, v
         }
         return try {
             guard()
-            session.settings.setBound(target, binding.entry.setting, value, if (binding.resourceBound) binding.token else null, guard).also { mutableState.update { it.copy(error = null) } }
+            session.settings.setBound(target, binding.entry.setting, value, if (binding.resourceBound) binding.token else null, guard).also { mutableState.update { it.copy(rejection = null) } }
         } catch (exception: IllegalArgumentException) { reject(exception.message ?: "Invalid value") }
         catch (exception: IllegalStateException) { reject(exception.message ?: "Unavailable operation") }
     }
-    private fun reject(message: String): Nothing? { mutableState.update { it.copy(error = message) }; return null }
+    private fun reject(message: String): Nothing? {
+        mutableState.update { it.copy(rejection = message) }
+        effectChannel.trySend(SettingsEffect.Rejected(message))
+        return null
+    }
     fun close() {
         if (!closed.compareAndSet(false, true)) return
         generation.incrementAndGet(); scope.cancel(); effectChannel.close()

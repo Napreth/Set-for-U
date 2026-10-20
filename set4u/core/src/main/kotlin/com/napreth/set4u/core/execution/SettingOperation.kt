@@ -40,7 +40,7 @@ data class VerificationPolicy(val attempts: Int = 1, val delayMillis: Long = 100
 }
 
 /** Business behavior shared by settings components and direct application operations. */
-interface SettingHandler {
+interface SettingHandler : Handler {
     val verificationPolicy: VerificationPolicy get() = VerificationPolicy()
 
     suspend fun inspect(context: SettingContext): SettingSnapshot
@@ -80,6 +80,7 @@ internal data class SettingOperation(
     val handler: SettingHandler,
     val admissionKey: String? = null,
     val guard: () -> Unit = {},
+    val retainedValue: SettingValue = desiredValue,
 ) {
     init { require(settingId.isNotBlank()) }
 }
@@ -106,12 +107,15 @@ data class SettingResult(
     val evidenceTruncated: Boolean = false,
 )
 
-class SettingContext internal constructor(
+open class HandlerContext internal constructor(
     val target: SettingTarget,
     private val executor: ShellExecutor,
     private val evidence: EvidenceLog,
 ) {
+    @Volatile private var active = true
+    internal fun finish() { active = false }
     suspend fun execute(request: ShellRequest): ShellResult {
+        check(active) { "Handler context is no longer active" }
         try {
             val result = executor.execute(request)
             evidence.add(CommandEvidence(request, result))
@@ -132,6 +136,7 @@ class SettingContext internal constructor(
         request: Request,
         timeoutMillis: Long = 15_000,
     ): Response {
+        check(active) { "Handler context is no longer active" }
         val diagnostic = ShellRequest(ShellCommand.arguments("device-task"), evidenceLabel = "device-task:${descriptor.id}")
         try {
             return executor.executeTask(target, descriptor, request, timeoutMillis).also {
@@ -143,6 +148,9 @@ class SettingContext internal constructor(
         }
     }
 }
+
+class SettingContext internal constructor(target: SettingTarget, executor: ShellExecutor, evidence: EvidenceLog) :
+    HandlerContext(target, executor, evidence)
 
 internal class EvidenceLog {
     private val entries = mutableListOf<CommandEvidence>()

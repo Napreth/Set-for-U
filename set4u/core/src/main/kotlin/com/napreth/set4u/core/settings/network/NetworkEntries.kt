@@ -19,7 +19,7 @@ object NetworkEntries {
 object NetworkTexts {
     val resources = TextResources(mapOf(
         "zh-CN" to mapOf(
-            "home.title" to "设置", "network.title" to "网络与通信", "wifi.title" to "WLAN", "wifi.toggle" to "使用 WLAN",
+            "home.title" to "设置", "network.title" to "网络与通信", "wifi.title" to "WLAN", "wifi.toggle" to "启用 WLAN",
             "wifi.manage" to "连接与管理网络", "wifi.keywords" to "Wi-Fi 无线网络 wireless",
             "mobile.title" to "移动数据", "mobile.sim" to "SIM 卡管理", "mobile.esim" to "eSIM",
             "hotspot.title" to "热点和网络共享", "bluetooth.title" to "蓝牙", "nfc.title" to "NFC", "airplane.title" to "飞行模式",
@@ -29,7 +29,7 @@ object NetworkTexts {
             "certificates.title" to "TLS 证书", "certificates.trust" to "受信任的凭据", "certificates.install" to "安装证书",
         ),
         "en" to mapOf(
-            "home.title" to "Settings", "network.title" to "Network & communication", "wifi.title" to "WLAN", "wifi.toggle" to "Use WLAN",
+            "home.title" to "Settings", "network.title" to "Network & communication", "wifi.title" to "WLAN", "wifi.toggle" to "Enable WLAN",
             "wifi.manage" to "Connect and manage networks", "wifi.keywords" to "Wi-Fi wireless network",
             "mobile.title" to "Mobile data", "mobile.sim" to "SIM management", "mobile.esim" to "eSIM",
             "hotspot.title" to "Hotspot & tethering", "bluetooth.title" to "Bluetooth", "nfc.title" to "NFC", "airplane.title" to "Airplane mode",

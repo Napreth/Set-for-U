@@ -83,11 +83,13 @@ class FlagHandler : SettingHandler {
 }
 
 private val standardFlagHandler = FlagHandler()
+private val standardFlagFactory: () -> SettingHandler = ::FlagHandler
+private val testHandlerFactories = java.util.IdentityHashMap<SettingHandler, () -> SettingHandler>()
 
 fun flagDefinition(
     id: String = "sample.flag",
     handler: SettingHandler = standardFlagHandler,
-) = SettingDefinition(id, ValueType.Boolean, handler)
+) = SettingDefinition(id, ValueType.Boolean, if (handler === standardFlagHandler) standardFlagFactory else testHandlerFactories.getOrPut(handler) { { handler } })
 
 private val entryCache = java.util.IdentityHashMap<SettingDefinition, SettingEntry>()
 fun entryOf(definition: SettingDefinition): SettingEntry = entryCache.getOrPut(definition) {

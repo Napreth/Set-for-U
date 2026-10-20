@@ -1,12 +1,13 @@
 package com.napreth.set4u.core.settings
 
 import com.napreth.set4u.core.execution.SettingHandler
+import com.napreth.set4u.core.execution.HandlerDefinition
 
 /** Business value, validation and execution binding; presentation belongs to components. */
 data class SettingDefinition(
     val id: String,
     val valueType: ValueType,
-    val binding: SettingHandler? = null,
+    val binding: (() -> SettingHandler)? = null,
     val choices: List<String> = emptyList(),
     val minimum: Long? = null,
     val maximum: Long? = null,
@@ -14,6 +15,9 @@ data class SettingDefinition(
     val operationFunctions: Map<String, () -> SettingHandler> = emptyMap(),
     val actionParameters: Map<String, ActionParameter> = emptyMap(),
 ) {
+    val handlerDefinition: HandlerDefinition<SettingHandler> by lazy {
+        HandlerDefinition(id, SettingHandler::class, operationFunctions + (binding?.let { mapOf("default" to it) } ?: emptyMap()))
+    }
     init {
         require(id.isNotBlank())
         require(binding != null || operationFunctions.isNotEmpty()) { "Setting needs an operation" }
@@ -32,7 +36,7 @@ data class SettingDefinition(
 
     internal fun hasOperation(id: String): Boolean = if (id == "default") binding != null else id in operationFunctions
     internal fun createOperation(id: String): SettingHandler =
-        if (id == "default") checkNotNull(binding) else checkNotNull(operationFunctions[id]) { "Unknown operation $id" }.invoke()
+        handlerDefinition.create(id)
 
     fun validationError(value: SettingValue): String? {
         if (value.isAction) {
@@ -67,6 +71,6 @@ data class SettingDefinition(
     }
 }
 
-data class ActionParameter(val required: Boolean = true, val maxLength: Int = 4096) {
+data class ActionParameter(val required: Boolean = true, val maxLength: Int = 4096, val sensitive: Boolean = false) {
     init { require(maxLength in 0..16384) }
 }

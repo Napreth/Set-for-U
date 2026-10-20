@@ -34,6 +34,48 @@ internal class ExecutionEngine(
     private val gate = OperationScheduler()
     private val inFlight = mutableMapOf<SettingKey, InFlight>()
 
+    internal suspend fun <H : Handler, R> invokeHandler(
+        definition: HandlerDefinition<H>, target: SettingTarget,
+        assess: suspend () -> com.napreth.set4u.core.compatibility.CapabilityAssessment,
+        block: suspend (H, HandlerContext) -> R,
+    ): HandlerResult<R> {
+        check(scope.isActive) { "Session is closed" }
+        val job = scope.async {
+            val id = UUID.randomUUID().toString()
+            val evidence = EvidenceLog()
+            var started = false
+            var capability: com.napreth.set4u.core.compatibility.CapabilityAssessment? = null
+            fun result(outcome: HandlerOutcome, value: R? = null, message: String? = null) = HandlerResult(
+                id, definition.id, target, outcome, value,
+                message?.let { FailureReason(it, if (started && definition.effect == HandlerEffect.Mutating) ReasonCertainty.Unknown else ReasonCertainty.Certain) },
+                capability, evidence.snapshot(), evidence.truncated,
+            )
+            try {
+                gate.run(definition.effect == HandlerEffect.Mutating, options.queueTimeoutMillis) {
+                    withTimeoutOrNull(options.operationTimeoutMillis) {
+                        if (definition.requiresBridge) shell.requireReady()
+                        val current = assess().also { capability = it }
+                        val direct = current.operation as? com.napreth.set4u.core.compatibility.OperationAvailability.Direct
+                            ?: return@withTimeoutOrNull result(HandlerOutcome.Rejected, message = current.reason())
+                        val handler = definition.create(direct.operationId)
+                        require(handler !is SettingHandler) { "Setting handlers must use SettingsService" }
+                        started = true
+                        val context = HandlerContext(target, shell, evidence)
+                        val value = try { block(handler, context) } finally { context.finish() }
+                        currentCoroutineContext().ensureActive()
+                        result(HandlerOutcome.Completed, value)
+                    } ?: result(if (started && definition.effect == HandlerEffect.Mutating) HandlerOutcome.Uncertain else HandlerOutcome.TimedOut, message = "Handler timed out")
+                }
+            } catch (_: QueueTimeoutException) {
+                result(HandlerOutcome.QueueTimedOut, message = "Operation queue timed out")
+            } catch (exception: CancellationException) { throw exception }
+            catch (exception: Exception) {
+                result(if (started && definition.effect == HandlerEffect.Mutating) HandlerOutcome.Uncertain else HandlerOutcome.Failed, message = exception.message ?: "Handler failed")
+            }
+        }
+        try { return job.await() } finally { if (!job.isCompleted) job.cancel() }
+    }
+
     internal fun key(target: SettingTarget, settingId: String) =
         SettingKey(sessionId, target, settingId)
 
@@ -60,7 +102,7 @@ internal class ExecutionEngine(
             }
         }
         inFlight[key] = InFlight(operation, job)
-        store.start(key, trace.id, operation.desiredValue)
+        store.start(key, trace.id, operation.retainedValue)
         job.invokeOnCompletion {
             if (!trace.finished) {
                 store.finish(trace.result(
@@ -87,7 +129,8 @@ internal class ExecutionEngine(
             try {
                 gate.run(write = false, options.queueTimeoutMillis) {
                 withTimeoutOrNull(options.operationTimeoutMillis) {
-                    observe(key, handler, context(target, EvidenceLog()))
+                    val context = context(target, EvidenceLog())
+                    try { observe(key, handler, context) } finally { context.finish() }
                 } ?: SettingObservation(
                     key,
                     SettingSnapshot(null, SettingAccess.Unavailable, "Read timed out"),
@@ -148,6 +191,7 @@ internal class ExecutionEngine(
             )
             return result
         } finally {
+            trace.context?.finish()
             result?.let(store::finish)
             trace.finished = true
         }
@@ -157,6 +201,7 @@ internal class ExecutionEngine(
         val operation = trace.operation
         val handler = operation.handler
         val context = context(operation.target, trace.evidence)
+        trace.context = context
         operation.guard()
         val before = observe(trace.key, handler, context)
         trace.before = before
@@ -241,13 +286,14 @@ internal class ExecutionEngine(
         val operation: SettingOperation,
     ) {
         val evidence = EvidenceLog()
+        var context: SettingContext? = null
         var before: SettingObservation? = null
         var after: SettingObservation? = null
         var applyAttempted = false
         var finished = false
 
         fun result(outcome: SettingOutcome, reason: FailureReason? = null) = SettingResult(
-            id, key, operation.desiredValue, outcome, before, after, evidence.snapshot(), reason, evidence.truncated,
+            id, key, operation.retainedValue, outcome, before, after, evidence.snapshot(), reason, evidence.truncated,
         )
     }
 }

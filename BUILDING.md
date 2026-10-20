@@ -96,7 +96,7 @@ val session = Core.open(bridge, catalog, compatibility = rules)
 
 示例仅说明函数选择，不代表某项实际系统功能的兼容表。条件支持相等、整数范围、版本范围、日期范围、与、或、非；VersionParser 可处理厂商版本格式。replaces 声明明确覆盖关系，不按注册顺序或隐含优先级选函数。重复 ID、无效引用和循环在注册时拒绝；规则冲突、版本未知或选中未注册的函数时返回 Unknown，不自动尝试另一条操作路径。
 
-读取和修改都经过解析，一次操作固定使用同一套 inspect/check/apply/verify/explain。确认不支持的条目及空容器从渲染结果中隐藏，未知状态保留并显示原因；直接调用 SettingsService.set 同样受规则保护。旧的单一 binding 保留兼容入口，使用 operationFunctions 后则必须提供规则。
+读取和修改都经过解析，一次操作固定使用同一套 inspect/check/apply/verify/explain。确认不支持的条目及空容器从渲染结果中隐藏，未知状态保留并显示原因；直接调用 SettingsService.set 同样受规则保护。binding 和 operationFunctions 均接收工厂，不保存 Handler 实例；具名实现由规则选择。一次修改的前读、执行和验证使用同一个新实例。
 
 # 图标
 
@@ -134,4 +134,40 @@ HyperOS Miuix、ColorOS COUI 的字体与名称调整在 API 37 AVD 检查了中
 
 RootShellBridgeAvdTest 复用 BridgeContract，显式设置 SET4U_TEST_ADB_SERIAL 和 SET4U_TEST_ROOT=1 才运行。API 37 AVD 已通过普通 root、模拟 shell 的真实 UID/GID、参数转义、DEX、文件传输、超时及取消清理共 7 项定向检查。Core 133 项通过；这些后端检查沿用上轮结果，本轮没有修改 Bridge。
 
-工作模式页面改为三行，第三行左侧“授权”、右侧文字操作，root 的模拟 shell 开关另占一行。桌面本地 12 项测试通过，覆盖失败状态、超时、重试和四套主题的布局。API 37 AVD 验证了四套主题下启动、重试及切换模拟 shell 时的失败原因直接显示在状态中，不弹错误对话框；Shizuku 成功启用后清除旧原因，重启后仍正常。测试结束恢复原工作模式和外观配置。两版 Windows 便携包通过自带 Java 21 的四套主题浅深色渲染及 GUI 自检，Linux 包通过 CLI 自检，Linux GUI 未实测。
+工作模式页面改为三行，第三行左侧“授权”、右侧文字操作，模拟 shell 开关现已移到“关于 → 调试”。桌面本地 12 项测试通过，覆盖失败状态、超时、重试和四套主题的布局。API 37 AVD 验证了四套主题下启动、重试及切换模拟 shell 时的失败原因直接显示在状态中，不弹错误对话框；Shizuku 成功启用后清除旧原因，重启后仍正常。测试结束恢复原工作模式和外观配置。两版 Windows 便携包通过自带 Java 21 的四套主题浅深色渲染及 GUI 自检，Linux 包通过 CLI 自检，Linux GUI 未实测。
+
+
+## Handler 与兼容性框架回归
+
+HandlerRuntimeTest 验证自定义查询、结构化返回值、工厂实例隔离、共享队列、取消、超时和调用结束后的上下文失效。ResolutionPolicyTest 覆盖证据来源、作用域、冲突、过期、缓存及只读扫描；PageAvailabilityTest 覆盖跳转检测共享、重新进入、拒绝反馈，以及查询和修改的独立权限。FrameworkUiTest 在 Compose 场景中实际点击私有 Row，并检查回退渲染、加载错误、长列表惰性组合和提交拒绝。
+
+本轮 Core 152 项、桌面本地 13 项测试通过，51 项设备用例因普通测试未指定设备而跳过。单独指定 API 37 AVD 后，GenericHandlerAvdTest 通过真实 ADB 选择实现、执行查询并返回结构化结果。该测试没有修改无线设置。测试结果保存在 build/reports/architecture。
+
+运行 `python scripts/smoke-search-ui.py --serial emulator-5580` 可验证四套界面风格下的跨语言入口搜索、清空搜索、证书索引和 VPN 系统跳转，结果位于 build/reports/search-ui。API 37 AVD 本轮已通过，外观配置在结束时恢复；只读检查也确认 WLAN 显示与设备状态一致，NFC 的显示与设备报告的 feature 一致。这里使用的 API 37 AVD 声明了 NFC feature，不能把它当作实体 NFC 硬件验证。CI 已加入搜索冒烟，远端结果尚待实际运行。
+
+root Wi-Fi 扫描和连接已在后续无线页面实现；会修改系统的自动兼容性实测仍未接入。普通扫描只运行 ReadOnly Probe，其他测试保留 NotTested；报告不会自动变成发布规则。
+
+两版 Windows 便携包使用自带 Java 21 通过四套风格浅深色渲染、私有 Row 点击与 GUI 宿主自检；Linux 两版通过版本、Core 自检和随包 ADB 自检，Linux GUI 本轮未实测。测试用只读 AVD 实例已关闭，没有保存对原 AVD 的更改。
+
+
+## 无线页面验证
+
+`WirelessFrameworkTest` 检查独立设备信息并发采集、页面刷新缓存、写入前重新检查身份、密码脱敏与设备协议。`WirelessNavigationTest` 检查实际身份分流、强制内置页、从关于返回设备页面后的分流及子页返回；四套主题的本地渲染测试已迁移到外观和调试子页。
+
+准备好已授权 root 的 AVD，设置 SET4U_TEST_ADB_SERIAL 和 SET4U_TEST_ROOT=1 后，执行 `:desktop:test --tests '*WirelessAvdTest'`。用例验证真实 API 查询、Wi-Fi 扫描、蓝牙经典与 BLE 发现、测试网络删除、蓝牙名称修改、Wi-Fi 断开重连和实际热点共享启停。修改有回读，结束恢复名称、连接与共享状态；连接往返仅使用模拟器已连接的 AndroidWifi，测试创建的网络按完整名称清理，不处理其他网络。AVD 没有蓝牙外设，配对与外设连接、USB 共享及真实厂商 ROM 仍需要对应设备验证。
+
+`python scripts/smoke-wireless-ui.py --serial emulator-5554 --root` 要求应用 UID 的 root 已授权，检查内置无线页、非 root 系统跳转、调试覆盖和四套风格的外观、调试布局。省略 --root 时只检查非 root 路由与应用设置，适用于普通 CI 模拟器。测试恢复原工作模式、模拟 shell、内置页偏好和外观，报告在 build/reports/wireless-ui。不要并行运行多个 UIAutomator 脚本。
+
+无线页面本轮 Core 157 项、桌面本地 14 项通过，设备用例在普通本地测试中按未选择目标跳过。API 37 AVD 的三项 root 集成用例通过；Android 界面验证了 root 无线页、蓝牙开关回读往返、系统跳转、调试覆盖及偏好恢复，四套风格的外观与调试页面均已截图检查。
+
+最终 APK 另行验证了从系统设置返回后的无线数据重读：在外部改变蓝牙状态后，内置开关和扫描控件同步更新，结束恢复原状态。两版 Windows 便携包使用自带 Java 21 通过四套主题、无线密码表单保护、私有 Row 和 GUI 自检；Linux 两版通过 CLI 自检，Linux GUI 本轮未实测。
+
+WLAN 列表调整后，Core 161 项、桌面本地 15 项测试通过。WifiNetworksTest 覆盖当前网络去重、保存记录与扫描结果合并、同名不同安全类型、关闭 WLAN 后的缓存和详情状态更新；WifiPresentationTest 检查四套主题首页与详情的信息分配。API 37 AVD 在本机 root 模式下验证了四套主题的当前网络唯一显示、详情与保存列表往返、扫描后去重，截图和记录在 build/reports/wifi-layout。没有修改网络连接或保存记录，结束恢复外观偏好。两种构建类型的 Android、Windows 和 Linux 产物均已重新打包。
+
+WLAN 配置通过 WifiTask 调用系统 Wi-Fi 服务，协议版本为 2。WifiConfigurationValuesTest 检查静态地址、代理、密码与二维码转义，WifiPresentationTest 检查四套主题的布局、表单内下拉菜单和实际渲染二维码的解码。Core 164 项、桌面本地 17 项测试通过。
+
+显式设置 SET4U_TEST_ADB_SERIAL 和 SET4U_TEST_ROOT=1 后，运行 `:desktop:test --tests '*WifiConfigurationAvdTest'` 可验证网络配置与偏好写入。API 37 AVD 两项用例通过，包括当前 AndroidWifi 的静态 IP/DHCP 往返、临时网络上的代理/PAC、计费、多用户共享、隐藏网络、密码修改和分享，以及通知、扫描、WEP 策略的回读与恢复。报告保存在 build/reports/wifi-config-avd。该 AVD 报告不支持连接 MAC 随机化，因此只验证了设备 MAC 选项，界面禁用随机化选项；没有用模拟结果代替硬件能力。
+
+`python scripts/smoke-wifi-settings-ui.py --serial emulator-5554` 要求本机 root 已授权，检查首页、详情、代理和 IP 表单、二维码、高级 WLAN 设置，并通过界面修改和恢复开关。报告与截图位于 build/reports/wifi-settings-ui。它不安装证书，也不连接额外的 WLAN 或直连设备。
+
+API 37 AVD 已完成四套风格的实际点击检查，覆盖网络唯一显示、详情、代理和静态 IP 表单、偏好与高级页面。自动连接、公共网络通知、自动开启和扫描开关通过界面修改后回读，结束恢复原值；最终 APK 也验证了首次进入时的 WLAN 开关状态，以及证书安装和 WLAN 直连的系统页面跳转。`--read-only` 可跳过开关修改。Windows 便携包使用自带 Java 21 通过了表单与二维码的三项定向测试；两种构建类型的 APK、Windows 和 Linux 便携包均已更新。

@@ -77,8 +77,8 @@ def main():
         (output / f"{name}.xml").write_text(ET.tostring(tree(), encoding="unicode"), encoding="utf-8")
 
     def focused(name):
-        windows = adb("shell", "dumpsys", "window")
-        focus = next((line for line in windows.splitlines() if "mCurrentFocus=" in line), "")
+        windows = adb("shell", "dumpsys", "activity", "activities")
+        focus = next((line for line in windows.splitlines() if "topResumedActivity" in line or "mResumedActivity" in line), "")
         assert "com.napreth.set4u" in focus and "MainActivity" in focus, focus
         (output / f"{name}-focus.txt").write_text(focus, encoding="utf-8")
 
@@ -88,6 +88,7 @@ def main():
         tap(option)
 
     def about():
+        tap("关于选项卡" if visible("关于选项卡") else "About tab")
         tap("关于选项卡" if visible("关于选项卡") else "About tab")
 
     adb("shell", "input", "keyevent", "WAKEUP")
@@ -101,6 +102,7 @@ def main():
             if args.theme and theme not in args.theme:
                 continue
             print(f"{theme}: testing", flush=True)
+            tap("外观")
             choose("界面风格", title)
             scroll_to("界面风格")
             tap("界面风格")
@@ -121,8 +123,9 @@ def main():
             choose("主题", "深色")
             find("深色")
             choose("主题", "浅色")
+            back()
             choose("语言", "English")
-            find("Interface style")
+            find("Appearance")
             choose("Language", "简体中文")
             scroll_to("许可证")
             tap("许可证")
@@ -144,7 +147,7 @@ def main():
             label = find("授权")
             assert label[2] < button[0], "Action button must be to the right of its label"
             assert abs((label[1] + label[3]) - (button[1] + button[3])) < 24, "Action label and button must share the third row"
-            assert visible("以 root 模拟 shell 身份") == (original_mode == "root")
+            assert not visible("以 root 模拟 shell 身份")
             tap("设备信息")
             find("制造商")
             find(adb("shell", "getprop", "ro.product.model"))
@@ -167,8 +170,10 @@ def main():
         about()
         if not visible("关于选项卡"):
             choose("Language", "简体中文")
+        tap("外观")
         choose("界面风格", themes[original.get("theme", "cupertino")])
         choose("主题", modes[original.get("themeMode", "system")])
+        back()
         choose("语言", languages[original.get("language", "system")])
         assert preferences("MainActivity").get("workMode", "shell") == original_mode
     summary = {"serial": args.serial, "api": adb("shell", "getprop", "ro.build.version.sdk"), "themes": results, "originalWorkModePreserved": True, "appearanceRestored": True}

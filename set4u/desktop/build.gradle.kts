@@ -27,6 +27,7 @@ tasks.register<Sync>("stagePortable") {
     from(configurations.runtimeClasspath)
 }
 dependencies {
+    implementation(libs.zxing.core)
     implementation(compose.desktop.common)
     implementation(compose.material3)
     implementation(libs.compose.backhandler)

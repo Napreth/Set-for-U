@@ -17,6 +17,7 @@ sealed interface RowRequest {
 
 /** A binding belongs to the entry/VM. Its Row is a separate, presentation-only object. */
 data class EntryRow(val row: SettingRow, val request: RowRequest = RowRequest.Edit)
+class EntryContext internal constructor(val target: SettingTarget, val handlers: com.napreth.set4u.core.execution.HandlerQueries)
 class EntrySnapshot(val revision: Long, rows: List<EntryRow> = emptyList(), val validUntilMillis: Long? = null) {
     val rows: List<EntryRow> = Collections.unmodifiableList(ArrayList(rows))
     init {
@@ -50,6 +51,7 @@ open class SettingEntry(
 
     /** Collection is owned by the visible page, and is cancelled on refresh or closure. */
     open fun observe(target: SettingTarget): Flow<EntrySnapshot> = flowOf(EntrySnapshot(0))
+    open fun observe(context: EntryContext): Flow<EntrySnapshot> = observe(context.target)
 
     open fun rows(snapshot: EntrySnapshot, texts: TextResources, locale: String, style: EntryStyle): List<EntryRow> {
         val title = texts.resolve(title, locale)
@@ -72,6 +74,21 @@ open class SettingEntry(
     }
 
     fun textReferences(): List<UiText> = listOf(title, summary) + keywords + resources + choices.flatMap { listOf(it.title, it.summary) }
+}
+
+/** A connection entry can consume a scan handler without pretending the scan is a setting. */
+class HandlerSettingEntry(
+    setting: SettingDefinition, title: UiText, id: String = setting.id,
+    val sourceCapability: com.napreth.set4u.core.execution.HandlerDefinition<*>,
+    private val source: (EntryContext) -> Flow<EntrySnapshot>,
+) : SettingEntry(setting, title, id = id) {
+    init { require(sourceCapability.effect == com.napreth.set4u.core.execution.HandlerEffect.ReadOnly) { "Entry sources must be read-only" } }
+    override val dynamic = true
+    override fun observe(context: EntryContext) = source(context)
+    override fun rows(snapshot: EntrySnapshot, texts: TextResources, locale: String, style: EntryStyle): List<EntryRow> {
+        require(style == EntryStyle.Default)
+        return snapshot.rows
+    }
 }
 
 class DynamicSettingEntry(

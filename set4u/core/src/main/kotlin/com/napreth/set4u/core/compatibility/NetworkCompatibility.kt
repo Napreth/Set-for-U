@@ -24,7 +24,9 @@ object NetworkCompatibility {
         CompatibilityRule("network.nfc.android35", NetworkSettings.nfc.id, DeviceCondition.All(listOf(
             DeviceCondition.IntegerRange(DeviceFields.Sdk, 35), DeviceCondition.HasFeature("android.hardware.nfc"),
         )), RuleDecision.Use("shell35")),
-    ), policies = NetworkSettings.definitions.associate { definition ->
+    ) + (listOf(com.napreth.set4u.core.network.WirelessCapabilities.queries.id) + com.napreth.set4u.core.network.WirelessCapabilities.actions.values.map { it.id }).map {
+        CompatibilityRule("$it.android30", it, DeviceCondition.IntegerRange(DeviceFields.Sdk, 30), RuleDecision.Use("default"))
+    }, policies = NetworkSettings.definitions.associate { definition ->
         val probe = when (definition.id) {
             NetworkSettings.nfc.id -> FeatureSupportProbe("android.hardware.nfc")
             NetworkSettings.bluetooth.id -> FeatureSupportProbe("android.hardware.bluetooth")
@@ -38,5 +40,5 @@ object NetworkCompatibility {
             else -> null
         }
         definition.id to CapabilityPolicy(probe, setOf(ExecutionIdentity.Shell, ExecutionIdentity.Root), manual = manual)
-    })
+    } + com.napreth.set4u.core.network.WirelessCapabilities.policies)
 }

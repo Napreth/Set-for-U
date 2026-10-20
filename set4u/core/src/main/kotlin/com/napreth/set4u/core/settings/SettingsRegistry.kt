@@ -21,6 +21,8 @@ class SettingsRegistry(definitions: List<SettingDefinition>) {
     operator fun get(id: String): SettingDefinition = definitions[id]
         ?: throw IllegalArgumentException("Unregistered setting: $id")
 
+    fun all(): List<SettingDefinition> = definitions.values.toList()
+
     internal fun resolve(reference: SettingDefinition): SettingDefinition = get(reference.id).also {
         require(it.sameDefinition(reference)) { "Conflicting global setting definition: ${reference.id}" }
     }

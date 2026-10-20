@@ -270,7 +270,7 @@ class ExecutionEngineTest {
                 applied = true
             }
         }
-        val definition = com.napreth.set4u.core.settings.SettingDefinition("sample.action", com.napreth.set4u.core.settings.ValueType.Action, handler)
+        val definition = com.napreth.set4u.core.settings.SettingDefinition("sample.action", com.napreth.set4u.core.settings.ValueType.Action, { handler })
         withSession(catalog = catalogOf(definition)) { session ->
             val result = session.settings.set(Target, definition, SettingValue.Action).await()
             assertTrue(applied)

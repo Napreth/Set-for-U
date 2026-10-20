@@ -33,3 +33,8 @@ COUI 1.1.0 (coui-ui, coui-core, coui-squircle)
 Copyright 2024-2026 compose-coui-ui contributors
 https://github.com/suqi8/coui
 Apache License 2.0; see Apache-2.0.txt.
+
+ZXing Core 3.5.3
+Copyright ZXing authors and contributors
+https://github.com/zxing/zxing
+Apache License 2.0; see Apache-2.0.txt.

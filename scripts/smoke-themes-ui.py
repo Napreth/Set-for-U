@@ -82,6 +82,7 @@ def main():
 
     def about():
         tap_either("关于选项卡", "About tab")
+        tap_either("关于选项卡", "About tab")
 
     def chinese():
         if maybe("Language"):
@@ -91,7 +92,7 @@ def main():
             scroll_to("语言")
             tap("语言")
             tap("简体中文")
-        find("界面风格")
+        find("外观")
 
     def connect():
         tap("工作模式选项卡")
@@ -112,7 +113,7 @@ def main():
     def switch(expected=None):
         for _ in range(12):
             for node in tree().iter("node"):
-                if node.get("checkable") == "true" and node.get("content-desc") == "使用 WLAN" and node.get("enabled") == "true":
+                if node.get("checkable") == "true" and node.get("content-desc") == "启用 WLAN" and node.get("enabled") == "true":
                     if expected is None or node.get("checked") == str(expected).lower():
                         return node
             time.sleep(.3)
@@ -125,16 +126,31 @@ def main():
         switch(expected)
         assert wifi() == expected
 
+    try:
+        mode_xml = ET.fromstring(adb("shell", "run-as", "com.napreth.set4u", "cat", "shared_prefs/MainActivity.xml"))
+    except subprocess.CalledProcessError:
+        mode_xml = ET.fromstring("<map/>")
+    own_before = next((n.get("value") == "true" for n in mode_xml if n.get("name") == "ownPages"), False)
+    def own_pages(enabled):
+        about(); tap("调试")
+        node = next(n for n in tree().iter("node") if n.get("checkable") == "true" and n.get("content-desc") == "始终使用内置设置页")
+        if (node.get("checked") == "true") != enabled:
+            b = [int(n) for n in re.findall(r"\d+", node.get("bounds"))]
+            adb("shell", "input", "tap", str((b[0]+b[2])//2), str((b[1]+b[3])//2))
+        back()
+
     before = wifi()
     results = []
     try:
         start()
         about()
         chinese()
+        own_pages(True)
         tap("设置选项卡")
         connect()
         for theme_id, title in [("coui", "ColorOS COUI"), ("material", "Google Material"), ("miuix", "HyperOS Miuix"), ("cupertino", "Apple Cupertino")]:
             about()
+            tap("外观")
             process = adb("shell", "pidof", "com.napreth.set4u")
             tap("界面风格")
             screenshot(f"{theme_id}-dropdown-before")
@@ -149,10 +165,10 @@ def main():
             tap("浅色")
             find("浅色")
             screenshot(f"{theme_id}-light")
+            back()
             tap("语言")
             tap("English")
-            find("Interface style")
-            find("Theme")
+            find("Appearance")
             tap("Settings tab")
             tap("Network & communication")
             find("Bluetooth")
@@ -178,14 +194,16 @@ def main():
             tap("关闭")
             start()
             about()
+            find("简体中文")
+            tap("外观")
             find(title)
             find("浅色")
-            find("简体中文")
             screenshot(f"{theme_id}-restart")
             tap("设置选项卡")
             results.append({"theme": theme_id, "saved": True, "restart": True, "darkAndLight": True, "appAndCoreLanguage": True, "wifiReadbackRoundtrip": True, "nfcHidden": True, "licenseDialog": True})
             print(f"{theme_id}: OK", flush=True)
         about()
+        tap("外观")
         tap("主题")
         tap("跟随系统")
         original_night = adb("shell", "cmd", "uimode", "night")
@@ -203,6 +221,9 @@ def main():
         (output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(summary, ensure_ascii=False))
     finally:
+        about()
+        chinese()
+        own_pages(own_before)
         if wifi() != before:
             adb("shell", "svc", "wifi", "enable" if before else "disable")
 

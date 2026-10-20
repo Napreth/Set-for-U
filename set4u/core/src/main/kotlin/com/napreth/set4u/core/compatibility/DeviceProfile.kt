@@ -4,6 +4,9 @@ import com.napreth.set4u.core.bridge.*
 import java.util.Collections
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 enum class FactState { Known, Absent, Unavailable }
 
@@ -68,26 +71,25 @@ class DeviceInfoCollector(
         val result = command("getprop").requireSuccess()
         val properties = parseProperties(result.stdout)
         check(properties.isNotEmpty()) { "Device returned no readable system properties" }
-        val facts = linkedMapOf<DeviceField, DeviceFact>()
-        suspend fun probe(field: DeviceField, vararg args: String) {
-            facts[field] = try {
-                val response = command(*args)
-                val text = response.stdout.trim().takeIf { response.exitCode == 0 && it.isNotEmpty() }
-                DeviceFact(text, if (text == null) FactState.Unavailable else FactState.Known, args.joinToString(" "), response.stderr.take(512).ifBlank { null })
+        val probes = listOf(
+            DeviceFields.KernelRelease to arrayOf("uname", "-r"),
+            DeviceFields.KernelBuild to arrayOf("uname", "-v"),
+            DeviceFields.Architecture to arrayOf("uname", "-m"),
+            DeviceFields.PageSize to arrayOf("getconf", "PAGESIZE"),
+            DeviceFields.PackageFeatures to arrayOf("pm", "list", "features"),
+        )
+        val facts = coroutineScope { probes.map { (field, args) -> async {
+            field to try {
+                val response = command(*args).requireSuccess()
+                val text = if (field == DeviceFields.PackageFeatures) {
+                    val lines = response.stdout.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+                    check(lines.isNotEmpty() && lines.all { it.matches(Regex("feature:[A-Za-z0-9_.]+(?:=.*)?")) }) { "Unrecognised package feature list" }
+                    lines.map { it.removePrefix("feature:").substringBefore('=') }.distinct().joinToString("\n")
+                } else response.stdout.trim().takeIf { it.isNotEmpty() }
+                DeviceFact(text, if (text == null) FactState.Unavailable else FactState.Known, args.joinToString(" "))
             } catch (exception: CancellationException) { throw exception }
             catch (exception: Exception) { DeviceFact(null, FactState.Unavailable, args.joinToString(" "), exception.message) }
-        }
-        probe(DeviceFields.KernelRelease, "uname", "-r")
-        probe(DeviceFields.KernelBuild, "uname", "-v")
-        probe(DeviceFields.Architecture, "uname", "-m")
-        probe(DeviceFields.PageSize, "getconf", "PAGESIZE")
-        facts[DeviceFields.PackageFeatures] = try {
-            val response = command("pm", "list", "features").requireSuccess()
-            val lines = response.stdout.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
-            check(lines.isNotEmpty() && lines.all { it.matches(Regex("feature:[A-Za-z0-9_.]+(?:=.*)?")) }) { "Unrecognised package feature list" }
-            DeviceFact(lines.map { it.removePrefix("feature:").substringBefore('=') }.distinct().joinToString("\n"), FactState.Known, "pm list features")
-        } catch (exception: CancellationException) { throw exception }
-        catch (exception: Exception) { DeviceFact(null, FactState.Unavailable, "pm list features", exception.message) }
+        } }.awaitAll().toMap() }
         return DeviceProfile(properties, facts, clock())
     }
 

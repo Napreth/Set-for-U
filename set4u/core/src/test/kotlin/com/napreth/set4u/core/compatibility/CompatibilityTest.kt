@@ -150,7 +150,7 @@ class CompatibilityTest {
     @Test fun directWritesCannotBypassCompatibilityAndUnsupportedRowsAreHidden() = runTest {
         var invoked = 0
         val definition = SettingDefinition("sample.flag", ValueType.Boolean, operationFunctions = mapOf("native" to { invoked++; FlagHandler() }))
-        val registry = CompatibilityRegistry(listOf(CompatibilityRule("absent", definition.id, DeviceCondition.Always, RuleDecision.Unsupported("Not in this ROM"))))
+        val registry = CompatibilityRegistry(listOf(CompatibilityRule("absent", definition.id, DeviceCondition.Always, RuleDecision.Absent("Not in this ROM"))))
         val page = testPage("sample", "设置", listOf(entryOf(definition)))
         withSession(catalog = SettingsCatalog(page), compatibility = registry) { session ->
             val result = session.settings.set(Target, definition, Enabled).await()
@@ -177,6 +177,8 @@ class CompatibilityTest {
             assertTrue(session.compatibility.resolve(definition) is CompatibilityResolution.Unknown)
             assertEquals(1, collections)
             vm.refresh().join()
+            assertEquals(1, collections)
+            session.compatibility.deviceProfile(refresh = true)
             assertEquals(2, collections)
             vm.close()
         }
@@ -190,7 +192,7 @@ class CompatibilityTest {
         }
         withSession { session ->
             assertTrue(session.compatibility.resolve(definition) is CompatibilityResolution.Unsupported)
-            assertTrue(session.compatibility.resolve(definition.copy(binding = FlagHandler())) is CompatibilityResolution.Unsupported)
+            assertTrue(session.compatibility.resolve(definition.copy(binding = ::FlagHandler)) is CompatibilityResolution.Unsupported)
         }
     }
 }

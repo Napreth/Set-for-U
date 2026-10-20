@@ -33,6 +33,7 @@ android {
     }
 }
 dependencies {
+    implementation(libs.zxing.core)
     implementation(compose.runtime)
     implementation(compose.foundation)
     implementation(compose.material3)

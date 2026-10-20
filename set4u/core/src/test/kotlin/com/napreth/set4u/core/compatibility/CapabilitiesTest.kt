@@ -35,7 +35,9 @@ class CapabilitiesTest {
         val flag = flagDefinition()
         val excluded = CompatibilityRegistry(listOf(CompatibilityRule("rom.removed", flag.id, DeviceCondition.Always, RuleDecision.Unsupported("Removed from this ROM"))))
         withSession(catalog = catalogOf(flag), compatibility = excluded) { session ->
-            assertTrue(session.compatibility.assess(flag).support is DeviceSupport.Unsupported)
+            val assessment = session.compatibility.assess(flag)
+            assertEquals(DeviceSupport.Supported, assessment.support)
+            assertTrue(assessment.operation is OperationAvailability.Unavailable)
         }
         val missing = CompatibilityRegistry(listOf(CompatibilityRule("newer", flag.id, DeviceCondition.IntegerRange(DeviceFields.Sdk, 40), RuleDecision.Use("default"))), mapOf(flag.id to CapabilityPolicy(manual = SystemSettingsScreen.Wifi)))
         withSession(catalog = catalogOf(flag), compatibility = missing, deviceProfileSource = DeviceProfileSource { DeviceProfile(mapOf("ro.build.version.sdk" to "35")) }) { session ->

@@ -94,6 +94,8 @@ jobs:
             if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-network-ui.py --serial emulator-5554 --radios; fi
             if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-themes-ui.py --serial emulator-5554; fi
             if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-app-ui.py --serial emulator-5554; fi
+            if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-search-ui.py --serial emulator-5554; fi
+            if [ '${{ matrix.api }}' -ge 35 ]; then python scripts/smoke-wireless-ui.py --serial emulator-5554; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -103,6 +105,8 @@ jobs:
             build/reports/network-ui/
             build/reports/themes-ui/
             build/reports/app-ui/
+            build/reports/search-ui/
+            build/reports/wireless-ui/
             set4u/core/build/test-results/
             set4u/desktop/build/test-results/
             buildSrc/build/test-results/

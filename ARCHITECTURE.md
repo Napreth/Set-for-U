@@ -13,9 +13,9 @@ Core 的主要包为 settings、settings/presentation、viewmodel、localization
 
 Android 和 Desktop 都使用 Compose。set4u/ui 是两个应用共同编译的源码目录，不依赖 Android 或 Swing API；三个构建模块保持不变。AppController 管理选项卡、页面导航、SettingsViewModel 和 Session 生命周期，AppPlatform 提供 Bridge、只读设备信息采集、外部链接、系统设置入口与本机配置读写。页面操作仍通过共享 ViewModel 提交，组件库不参与准入与执行。
 
-“关于 → 应用设置 → 界面风格”提供 Google Material、Apple Cupertino、HyperOS Miuix、ColorOS COUI。ThemeComponents 将分组、条目、开关、输入、按钮和导航映射到对应组件库。所有下拉菜单由 AppController 保存状态，在主窗口内通过 AppMenuOverlay 渲染，避免独立 Popup 窗口不可见或夺走输入焦点。菜单按条目位置定位，支持返回键、Esc 和点击空白关闭；遮罩期间屏蔽底层页面的无障碍节点。Material、Cupertino 对话框同样在主窗口叠加，Miuix、COUI 使用库内浮层，仍放在对应 Scaffold 的 content 中注册宿主状态。Cupertino 的悬浮选项卡通过 Compose Backdrop 捕获页面图层，捕获对象不包含选项卡自身，不调用 View.draw 抓取正在绘制的 Compose 页面。低版本 Android 使用不透明底栏，支持的设备使用背景模糊和折射。
+“关于 → 外观 → 界面风格”提供 Google Material、Apple Cupertino、HyperOS Miuix、ColorOS COUI。ThemeComponents 将分组、条目、开关、输入、按钮和导航映射到对应组件库。所有下拉菜单由 AppController 保存状态，在主窗口内通过 AppMenuOverlay 渲染，避免独立 Popup 窗口不可见或夺走输入焦点。菜单按条目位置定位，支持返回键、Esc 和点击空白关闭；遮罩期间屏蔽底层页面的无障碍节点。Material、Cupertino 对话框同样在主窗口叠加，Miuix、COUI 使用库内浮层，仍放在对应 Scaffold 的 content 中注册宿主状态。Cupertino 的悬浮选项卡通过 Compose Backdrop 捕获页面图层，捕获对象不包含选项卡自身，不调用 View.draw 抓取正在绘制的 Compose 页面。低版本 Android 使用不透明底栏，支持的设备使用背景模糊和折射。
 
-“关于”的“应用设置”包含界面风格、主题模式和应用语言，均使用锚定条目的下拉菜单。ThemeMode 支持 System / Light / Dark；AppLanguage 支持 System / zh-CN / en，解析后的 locale 传入共享 ViewModel 与应用文案表。切换语言保留 Session，下一次显示设备页面时以新 locale 创建 ViewModel。
+“关于”首页提供外观、语言和调试。外观子页包含界面风格与主题模式，语言在关于首页选择，三项均使用锚定条目的下拉菜单。ThemeMode 支持 System / Light / Dark；AppLanguage 支持 System / zh-CN / en，解析后的 locale 传入共享 ViewModel 与应用文案表。切换语言保留 Session，下一次显示设备页面时以新 locale 创建 ViewModel。
 
 HyperOS Miuix 和 ColorOS COUI 的普通条目通过组件库的内容槽设置常规字重，不使用库内固定为 Medium 的标题重载。字体由平台提供，Android 使用系统无衬线字体，桌面优先选择已安装的中文无衬线字体，避免中文落到宋体。两套库各自的字号、行高和标题层级继续保留；界面风格的存储 ID 仍为 miuix、coui。
 
@@ -23,7 +23,7 @@ HyperOS Miuix 和 ColorOS COUI 的普通条目通过组件库的内容槽设置�
 
 ## 设置项、条目和 Row
 
-SettingDefinition 是操作层的规范定义，包含稳定 ID、值类型、选项 ID、输入约束、参数模式、默认 Handler 和具名操作工厂。这里不再放标题、说明或翻译。SettingsRegistry 对同 ID 的业务约束和实现做全局一致性检查，页面不能换掉后端；Handler 与工厂同时检查对象身份，不能用自定义 equals 冒充规范实现。
+SettingDefinition 是设置的规范定义，包含稳定 ID、值类型、选项 ID、输入约束、参数模式、默认 Handler 工厂和具名实现工厂。这里不放标题、说明或翻译。默认与具名实现均在每次读取或修改时创建；一次修改的前读、执行和验证复用同一个实例，不把可变 Handler 实例放进全局目录。SettingsRegistry 按稳定 ID 检查业务约束及工厂身份，页面只能引用规范定义。
 
 SettingEntry 是设置条目定义，每个 Entry 只绑定一个 SettingDefinition，一个设置可以没有 Entry，也可以有多个。Entry ID 与 Setting ID 分开；EntryRegistry 按 Entry ID 注册，页面引用已注册的对象。不同 Entry 可以有自己的 UiText 资源引用、选项标签、关键词、额外模板资源和 Row 生成方式，但共用设置状态、兼容规则和执行入口。没有界面的设置只注册 Definition 即可，不需要补一个空 Entry。
 
@@ -35,6 +35,8 @@ flowchart LR
 ```
 
 Row 只包含展示数据和界面意图，不持有 Definition、Handler 或执行闭包。SettingRow 的 control 可以是 Toggle、Value、Input、Choice、Selection 或 Action，rendererKey 可由页面指定私有样式。NavigationRow 保存页面或系统目的地。RowContainer 只是有序 Row 集合，不再设单选容器、复选容器或嵌套列表树；单选和复选都是普通 Selection Row。
+
+共享 UI 的 RowRenderers 按页面 ID 和 rendererKey 注册私有组件，组件接收当前 SettingUiItem、带原 Row token 的操作入口和标准渲染回退。不同页面可以复用同名 rendererKey；未注册的 key 使用标准条目。设置列表按 Row 使用 LazyColumn，整组样式不要求一次组合全部动态结果。
 
 EntryRow 把展示 Row 与 RowRequest 关联，但这份绑定留在 Entry 和 ViewModel 内部。平台只收到 SettingUiItem 的 Row、token、实际值和状态。一次点击可以对应固定值、编辑值或某个复选选项，平台不需要知道 Handler。
 
@@ -58,15 +60,27 @@ val options = SettingEntry(language, UiText.Key("language.options"), choices = l
 
 ## 动态数据与页面生命周期
 
+Handler 是空的公共接口，业务类可以定义自己的查询方法和结构化返回值。SettingHandler 是其中一种执行模板，继续使用 inspect、check、prepare、apply、inspect、verify 和 explain。HandlerDefinition 以稳定能力 ID 注册类型、实现工厂及只读／修改属性；同一个接口里权限要求不同的方法应注册为不同能力，而不是共用一个粗粒度权限结论。
+
+session.handlers.invoke(definition, target) 接收已注册的规范定义，在与设置操作共用的队列内重新判断兼容性，选择实现，再调用业务代码。它提供整体超时、调用方取消、Session 关闭和有容量限制的执行证据。修改型调用在开始后出错或超时会标为 Uncertain，普通 Completed 只表示业务方法完成，不代表设置回读验证成功。SettingHandler 必须通过 SettingsService 调用，通用入口会拒绝直接调用它。HandlerContext 只在本次执行期间有效，结束后不能继续发命令。
+
+页面上下文和 HandlerSettingEntry 的 EntryContext 提供只读 HandlerQueries。HandlerSettingEntry 单独声明 sourceCapability，数据源通过自己的能力检查，不要求连接设置已经可写；数据行仍按各自 RowRequest 和连接设置状态决定能否操作。一个连接设置的 Entry 可以用扫描 Handler 提供动态数据，再把连接操作交给自己的 SettingDefinition；扫描本身不需要 ActionValue 或虚构设置项。查询随页面作用域取消。WLAN、蓝牙和热点的真实数据由 WirelessViewModel 通过 WirelessQuery 获取，写入由规范设置定义交给设置引擎。
+
+普通 Handler 默认需要就绪的 Bridge。本机 API 查询可以显式声明 requiresBridge=false，这不会授予命令权限：上下文中的 Shell 和 DeviceTask 调用仍检查 Bridge，应用 API 的权限需要由对应 Probe 及系统 API 检查。持续一段时间的结果应在 invoke 块内收集，并用 channelFlow 向 Entry 发布；不能返回一个依赖已经结束的 HandlerContext 的冷 Flow。
+
 DynamicSettingEntry 从业务查询服务接收 Flow<EntrySnapshot>。快照有递增 revision、可选 validUntilMillis，以及零个或多个运行时 EntryRow。空结果如何呈现由具体 Entry 或页面决定：可以显示“未扫描到 Wi-Fi”，也可以隐藏结果条目，仅保留页面上的“添加网络”。通用框架直接使用条目给出的 Row，不插入固定占位。Wi-Fi 的扫描结果、蓝牙设备等是运行时资源，不应按结果数量注册 Definition 或 Entry。来源可以是一次查询，也可以是页面可见期间的更新流；框架不要求单独建立数据源层。所有 Entry 的数据源在启动前都要通过能力检查，资源型快照自动受到版本与有效期约束。
 
 每个快照、发布的容器、Row 列表和选项列表都复制后发布。参数化动作使用 SettingValue.ActionValue，Definition 的 actionParameters 声明允许的参数、必填约束和长度上限。参数集合不可变，默认字符串表示不打印值，执行证据仍遵守独立脱敏规则。
 
 ViewModel 在首次加载时发布布局，再调用 onEnter，默认读取声明的 Entry。Entry 的 Flow 由页面作用域收集，进入钩子完成不需要等待流结束；刷新、关闭和模式切换会取消旧收集。新加载有独立代次，即使旧查询忽略取消，也不能覆盖新页面。
 
+SettingsPage 实现 AvailabilityProbe，可重写 assess。每轮页面加载创建 AvailabilityCycle，相同目标页和目标上下文的检测结果只计算一次，多个跳转行共用这一结论。NavigationAvailabilityPolicy.FollowPage 隐藏确认不支持的入口，其他不可用状态置灰；ShowDisabled 保留入口，可用时仍正常；IgnorePage 不运行目标页的入口检测。进入目标页后重新检测，不可用时显示原因并停止进入钩子及动态数据源，诊断入口也不会打开空白页。
+
+加载和数据源错误保留在 SettingsUiState.error，页面已经显示时也展示错误入口。提交前拒绝写入 rejection 并发送 SettingsEffect.Rejected，由应用显示短暂提示；它不会制造一个执行结果。已经进入执行引擎的失败仍由 SettingResult 描述。排队未读保留旧观测，条目显示“待更新”，不把旧值误报成刚读取的结果。
+
 动态事件必须携带当前 Row token。token 包含页面代次、条目和数据版本，旧列表中的点击不能作用于复用 ID 的新 Row。提交时检查当前绑定与有效期，排队后在读取前和修改前再次检查；新快照、过期或页面关闭都能阻止尚未开始的旧操作。相同值但不同动态准入标识的请求不会错误共用 Deferred。静态页面关闭不会取消已经交给 Session 的普通修改。
 
-动态列表不为过期自动启动后台计时服务，最终准入检查使用 Session 时钟。生产网络页保留系统的网络选择入口；DynamicEntriesTest 用三个网络验证模型、参数、版本失效和队列期限，没有把内存样例放入实际 UI。
+动态列表不为过期自动启动后台计时服务，最终准入检查使用 Session 时钟。DynamicEntriesTest 用三个网络验证模型、参数、版本失效和队列期限，生产页面只展示实际扫描结果。
 
 ## 文案与搜索
 
@@ -75,6 +89,8 @@ UiText.Key 引用 TextResources，UiText.Literal 用于动态名称或不需要�
 exportUiMetadata 在编译后读取声明元数据，不连接设备、不收集 Entry Flow、不执行设置。输出位于 core/build/ui-metadata/<类型>/metadata，包含 texts.json、settings-index.json 和 settings-search.properties，随 Core JAR、桌面包和 APK 打包。新增动态模板的固定文本需要在 Entry.resources 中声明，SSID 等运行时值不进入导出。
 
 静态搜索以 Entry ID 和 Setting ID 为身份，记录页面入口，跨全部语言和别名匹配。搜索器校验打包词表的元数据指纹，运行时扩展或自定义目录不匹配时使用其自身声明生成词表。session.search 返回结果时再做能力判断，默认排除确认不存在的功能；诊断入口可以显式 includeUnsupported。未知、权限不足及系统跳转仍是结果，不能按不支持直接丢弃。
+
+纯跳转入口使用 NavigationEntry 声明文案、目标和关键词，由页面的 navigationEntries 注册。它们进入编译期索引的 navigation 区域，不需要 SettingDefinition。首页搜索框调用同一搜索服务，可以找到热点、VPN、证书等入口并跳转；目标页面的可用性与普通导航使用同一检测协议。
 
 ## 兼容性和操作资格
 
@@ -85,6 +101,14 @@ OperationAvailability 包含 Direct、RequiresPermission、RequiresPrivilege、M
 SupportProbe 可以按需检查运行时事实。当前 NFC、蓝牙使用已成功采集的 Package Manager feature 列表；读取失败保持 Unknown，不能把空输出当成没有硬件。已确认的支持事实在 Session 缓存，未知结果不缓存为否定结论。执行身份和权限单独读取，每次操作都重新评估，不能复用界面之前的可写结论。
 
 CompatibilityRegistry 继续按稳定设置 ID 选择具名操作，明确 replaces 关系处理 ROM 覆盖，注册顺序不决定胜者。缺少必要事实、存在冲突或找不到实现分别保留原因。版本匹配只选择完整后端，不能代替修改前的状态和权限检查。厂商特制功能也需要 ROM、版本和能力范围，不能只凭所属厂商品牌判定支持。
+
+规则同样可用于普通 Handler 的能力 ID。RuleDecision.Absent 声明功能确实不存在，Unsupported 表示指定操作路径不支持，后者不会把整个设备标成缺少功能。CompatibilityScope 可组合设备条件、身份、UID、目标包和 Android 用户，限制仅在命中的上下文中生效。
+
+CompatibilityEvidence 保存声明、历史扫描或实时探测的来源、结论、作用域、时间及证明类型。Presence 说明功能是否存在，Prerequisite 说明当前前置条件，Behavior 才能证明特定操作可完成；前置条件成功不会推翻已知的行为限制。过期或其他作用域的证据不参与解析，来源冲突保留在 CapabilityAssessment 中。
+
+ResolutionPolicy 选择 DeclaredOnly、ProbeOnly、DeclaredFirst、ProbeFirst 或 RequireBoth，并指定探测场景及冲突处理方式。ResolutionRule 复用设备条件、目标作用域和明确的 replaces 关系，冲突或缺失事实得到 Unknown，不靠注册顺序选胜者。策略按 Presence 或 Behavior 问题应用；真正执行前仍重新检查身份、权限和必要的实时前置条件，DeclaredOnly 不会跳过这些检查。
+
+CapabilityProbe 声明风险、证明类型和缓存要求。只缓存明确的设备存在性事实；权限及行为前置条件不使用 Session 缓存。页面加载、普通诊断和 session.scanner.scan(target) 都只运行 ReadOnly 探测，其他风险标为 NotTested。扫描器返回带证据和会话身份的结构化报告，不遍历调用设置的 apply，也不自动把单台设备的报告推广或发布为 ROM 规则。主动测试、恢复策略和兼容数据库发布仍需后续实现。
 
 DeviceProfile 从目标设备采集 getprop、uname、页大小及硬件 feature，记录来源与 Known、Unavailable 等状态。字段包括厂商、品牌、型号、产品与硬件标识、ROM 名称和版本、Android SDK、系统构建 ID、fingerprint、内核版本、安全补丁、SoC、ABI、基带和增量 OTA/SOTA 信息。厂商版本格式应提供专用解析器；dotted numeric 不能用于猜测所有 ROM 版本。
 
@@ -102,7 +126,7 @@ RootBridge 在通道上增加 root 身份，支持已有 UID 0、常规 su -c �
 
 Android root 模式包装 LocalProcessBridge，本机普通应用进程只负责启动 su。Shell 模式使用 ShizukuBridge。Desktop 的 root 模式包装已连接的 AdbBridge。模式切换期间取消页面绑定，旧 Session 关闭后再建立新会话；失败时保留该模式的未授权状态，不自动用另一身份继续执行。
 
-工作模式卡片依次显示模式下拉菜单、状态、授权操作。第三行左侧为“授权”，右侧为使用主题强调色的文字操作，没有按钮底色和边框，点击区域至少为 48dp。失败原因保存在页面状态中，右侧显示“重试”，不弹出错误对话框。重试清除旧原因，成功后显示“已启用”。选择 root 后增加“以 root 模拟 shell 身份”开关，模式与开关保存在平台本机配置中；切换任一项都会关闭旧 Session、重建 Bridge，观测和权限判断不能跨身份复用。桌面的目标序列号单独成组。
+工作模式卡片依次显示模式下拉菜单、状态、授权操作。第三行左侧为“授权”，右侧为使用主题强调色的文字操作，没有按钮底色和边框，点击区域至少为 48dp。失败原因保存在页面状态中，右侧显示“重试”，不弹出错误对话框。重试清除旧原因，成功后显示“已启用”。“以 root 模拟 shell 身份”开关位于“关于 → 调试”，非 root 工作模式下置灰。模式与开关保存在平台本机配置中；切换任一项都会关闭旧 Session、重建 Bridge，观测和权限判断不能跨身份复用。桌面的目标序列号单独成组。
 
 RootBridge 默认验证并使用 UID 0。显式开启 emulateShell 时仍先验证 root 授权，再探测 su 的 UID 2000 调用格式；只使用验证成功的格式执行，每个命令也检查 UID 2000。无法切换时连接失败，不改用 UID 0 完成设置。environment 返回实际的 Shell 身份，兼容性准入继续按实际身份判断。这是 shell UID 模拟，SELinux 域、附加组及挂载空间仍取决于 su 实现，不承诺与 adbd 完全相同。实现依据与参数说明可参阅 [Magisk su](https://topjohnwu.github.io/Magisk/tools.html#su) 和 [KernelSU su 实现](https://github.com/tiann/KernelSU/blob/main/userspace/ksud/src/su.rs)。
 
@@ -142,4 +166,17 @@ MainActivity 只安装 Compose 内容、接入 Android 生命周期和平台能�
 
 Core 测试覆盖参数校验、规范注册、同一 Entry 的不同呈现、动态资源版本、过期和排队失效、跨语言索引、权限变化、页面取消及回读。BridgeContract 在选定 AVD 上验证 ADB、Shizuku，并可显式追加 UID 0 的 RootBridge，覆盖二进制、文件替换、超时、取消、DEX 与权限恢复。UI 冒烟验证网络列表、选项卡、工作模式和实际开关回读。
 
-当前 WLAN、移动数据、蓝牙、NFC、飞行模式和私人 DNS 后端沿用原实现，静态 API 范围不等于所有 ROM 已验证。AVD 没有实际 NFC 与可用数据 SIM，正向 NFC、移动数据写入以及手机本机 su 授权仍需要对应硬件与真机环境。搜索资源与动态模型已经接通，实际扫描和连接业务按具体能力继续实现。
+当前 WLAN、移动数据、蓝牙、NFC、飞行模式和私人 DNS 后端沿用原实现，静态 API 范围不等于所有 ROM 已验证。AVD 没有实际 NFC 与可用数据 SIM，正向 NFC、移动数据写入以及手机本机 su 授权仍需要对应硬件与真机环境。搜索资源与动态模型已经接通，root WLAN、蓝牙管理已接入实际扫描和操作；无法由内置界面配置的类型保留系统入口。
+
+
+## 无线页面与应用偏好
+
+工作模式负责选择传输和执行身份，页面分流依据实际确认的 ExecutionIdentity。WLAN、蓝牙、热点在 root 身份下打开内置页，其他身份默认打开对应系统设置。移动数据已有 Shell 后端，继续使用自身页面。系统跳转不要求 Android 应用已获得 Shizuku 授权。切换身份后返回旧页面、重新进入、搜索跳转都遵守同一分流；root 下模拟 shell 使用 UID 2000，也按非 root 处理。
+
+“关于 → 调试”保存本机偏好 ownPages，可强制打开内置设置页；它不扩大执行权限。rootShell 仍使用原存储键，开关从工作模式页移入调试，非 root 工作模式置灰。外观与调试各有独立返回层级，语言留在关于首页。
+
+WirelessViewModel 随可见页面创建和关闭。初次进入只读取现有状态和缓存扫描结果，扫描由用户触发；接收器、经典蓝牙发现和 BLE 扫描都在本次设备任务内释放。页面关闭会取消查询，已提交修改由 Session 跟踪到完成。Wi-Fi 列表按 SSID 和安全类型合并 AP，已保存配置按 networkId 去重，兼容同一网络的开放／OWE 过渡配置。
+
+WirelessActionHandler 使用设置引擎执行前读、准入、修改与回读，验证实际连接、配对状态、配置或共享接口。热点通过 TetheringManager 启用网络共享，不使用只启动 Soft AP 的替代方案；共享接口按系统提供的接口正则分类。热点密码在设备端比较，只返回是否匹配。ActionParameter.sensitive 使执行结果和 Session 请求状态保留脱敏值，真实值只用于本次调用。
+
+常规刷新不再清空稳定设备画像，断线、身份会话更换或显式 deviceProfile(refresh = true) 才重新采集。DeviceInfoCollector 并发读取相互独立的事实；静态 SettingEntry 不启动无意义的数据源，定制子类的观察入口仍保留。页面展示身份在 Session 内复用，写入与通用执行准入仍重新读取身份和权限。网络首页只读飞行模式与 NFC，移动数据在进入子页时查询，避免首页等待 DEX 部署。共享界面移除了全页加载条，操作仍保留控件级忙碌状态。

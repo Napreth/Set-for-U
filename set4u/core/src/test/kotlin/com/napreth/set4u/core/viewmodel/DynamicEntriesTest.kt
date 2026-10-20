@@ -31,7 +31,7 @@ class DynamicEntriesTest {
     private class WifiFixture {
         var connected = "none"
         val writes = mutableListOf<String>()
-        val definition = SettingDefinition("wifi.connect", ValueType.Action, object : SettingHandler {
+        val definition = SettingDefinition("wifi.connect", ValueType.Action, { object : SettingHandler {
             override suspend fun inspect(context: SettingContext) = SettingSnapshot(SettingValue.TextValue(connected))
             override suspend fun apply(context: SettingContext, desiredValue: SettingValue) {
                 connected = (desiredValue as SettingValue.ActionValue).parameters.getValue("network")
@@ -40,7 +40,7 @@ class DynamicEntriesTest {
             override fun verify(before: SettingSnapshot, after: SettingSnapshot, desiredValue: SettingValue) =
                 if (after.value == SettingValue.TextValue((desiredValue as SettingValue.ActionValue).parameters.getValue("network"))) Verification.Satisfied
                 else Verification.NotSatisfied(FailureReason("Network differs"))
-        }, actionParameters = mapOf("network" to ActionParameter()))
+        } }, actionParameters = mapOf("network" to ActionParameter()))
         fun frame(revision: Long, names: List<String>, expires: Long? = null) = EntrySnapshot(revision, names.mapIndexed { i, name ->
             EntryRow(SettingRow("access-point-$i", name, RowControl.Action()), RowRequest.Fixed(SettingValue.ActionValue(mapOf("network" to name))))
         }, expires)

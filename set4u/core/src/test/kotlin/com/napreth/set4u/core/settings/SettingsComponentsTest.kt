@@ -42,7 +42,7 @@ class SettingsComponentsTest {
     @Test fun differentEntriesCannotReplaceTheCanonicalSettingImplementation() = runTest {
         val definition = flagDefinition()
         val first = SettingEntry(definition, UiText.Literal("First"), id = "first")
-        val second = SettingEntry(definition.copy(binding = FlagHandler()), UiText.Literal("Second"), id = "second")
+        val second = SettingEntry(definition.copy(binding = ::FlagHandler), UiText.Literal("Second"), id = "second")
         expectFailure<IllegalArgumentException> { SettingsCatalog(testPage("a", "A", listOf(first, second))) }
     }
     @Test fun searchKeepsSeparateEntryDestinationsForOneSetting() {
@@ -59,32 +59,32 @@ class SettingsComponentsTest {
     @Test fun entrySnapshotsFreezeBusinessListsAndTranslationTables() {
         val choices = mutableListOf("one")
         val labels = mutableMapOf("title" to "One")
-        val entry = SettingEntry(SettingDefinition("choice", ValueType.Choice, FlagHandler(), choices = choices), UiText.Key("title"), choices = listOf(EntryChoice("one", UiText.Key("title"))))
+        val entry = SettingEntry(SettingDefinition("choice", ValueType.Choice, { FlagHandler() }, choices = choices), UiText.Key("title"), choices = listOf(EntryChoice("one", UiText.Key("title"))))
         val resources = TextResources(mapOf("en" to labels), "en")
         choices.clear(); labels.clear()
         assertEquals(listOf("one"), entry.setting.choices)
         assertEquals("One", resources.resolve(entry.title))
     }
     @Test fun missingAndExtraChoiceLabelsAreRejected() = runTest {
-        val definition = SettingDefinition("choice", ValueType.Choice, FlagHandler(), choices = listOf("one"))
+        val definition = SettingDefinition("choice", ValueType.Choice, { FlagHandler() }, choices = listOf("one"))
         expectFailure<IllegalArgumentException> { SettingEntry(definition, UiText.Literal("Title")) }
         expectFailure<IllegalArgumentException> { SettingEntry(definition, UiText.Literal("Title"), choices = listOf(EntryChoice("other", UiText.Literal("Other")))) }
     }
     @Test fun boundsAndChoiceValidationBelongToTheBusinessDefinition() {
-        val integer = SettingDefinition("timeout", ValueType.Integer, FlagHandler(), minimum = 1, maximum = 60)
+        val integer = SettingDefinition("timeout", ValueType.Integer, { FlagHandler() }, minimum = 1, maximum = 60)
         assertNull(integer.validationError(SettingValue.IntegerValue(30)))
         assertNotNull(integer.validationError(SettingValue.IntegerValue(0)))
         assertNotNull(integer.validationError(SettingValue.IntegerValue(61)))
         assertNotNull(integer.validationError(SettingValue.TextValue("30")))
-        val single = SettingDefinition("single", ValueType.Choice, FlagHandler(), choices = listOf("default"))
-        val multiple = SettingDefinition("multiple", ValueType.MultiChoice, FlagHandler(), choices = listOf("default"))
+        val single = SettingDefinition("single", ValueType.Choice, { FlagHandler() }, choices = listOf("default"))
+        val multiple = SettingDefinition("multiple", ValueType.MultiChoice, { FlagHandler() }, choices = listOf("default"))
         assertNull(single.validationError(SettingValue.ChoiceValue("default")))
         assertNotNull(single.validationError(SettingValue.ChoiceValue("missing")))
         assertNull(multiple.validationError(SettingValue.MultiChoiceValue(emptySet())))
         assertNotNull(multiple.validationError(SettingValue.MultiChoiceValue(setOf("missing"))))
     }
     @Test fun parameterizedActionsAreValidatedAndDoNotPrintTheirValues() {
-        val definition = SettingDefinition("wifi.connect", ValueType.Action, FlagHandler(), actionParameters = mapOf("network" to ActionParameter(maxLength = 100)))
+        val definition = SettingDefinition("wifi.connect", ValueType.Action, { FlagHandler() }, actionParameters = mapOf("network" to ActionParameter(maxLength = 100)))
         val input = mutableMapOf("network" to "sensitive-ssid")
         val value = SettingValue.ActionValue(input)
         input.clear()

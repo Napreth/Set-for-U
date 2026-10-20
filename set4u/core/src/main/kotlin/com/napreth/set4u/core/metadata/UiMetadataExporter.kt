@@ -20,13 +20,20 @@ object UiMetadataExporter {
             "terms" to searchDocument(entry, catalog.texts),
         ) }
         File(directory, "texts.json").writeText(json(catalog.texts.translations), Charsets.UTF_8)
-        File(directory, "settings-index.json").writeText(json(mapOf("schema" to 1, "version" to args[1], "entries" to entries)), Charsets.UTF_8)
-        val properties = catalog.entries.all().joinToString("\n") { entry ->
-            val document = searchDocument(entry, catalog.texts)
-            "${entry.id}.hash=${fingerprint(document)}\n${entry.id}.terms=${property(document)}"
+        val navigation = catalog.navigation.map { entry -> mapOf(
+            "id" to entry.id, "title" to (entry.title as? UiText.Key)?.id,
+            "pages" to entry.pageIds.sorted(), "pageId" to entry.destination.pageId,
+            "systemScreen" to entry.destination.systemScreen?.name,
+            "resources" to entry.textReferences().filterIsInstance<UiText.Key>().map { it.id }.distinct(),
+            "terms" to searchDocument(entry, catalog.texts),
+        ) }
+        File(directory, "settings-index.json").writeText(json(mapOf("schema" to 2, "version" to args[1], "entries" to entries, "navigation" to navigation)), Charsets.UTF_8)
+        val documents = catalog.entries.all().map { it.id to searchDocument(it, catalog.texts) } + catalog.navigation.map { it.id to searchDocument(it, catalog.texts) }
+        val properties = documents.joinToString("\n") { (id, document) ->
+            "$id.hash=${fingerprint(document)}\n$id.terms=${property(document)}"
         }
         File(directory, "settings-search.properties").writeText(properties + "\n", Charsets.UTF_8)
-        println("UI metadata: ${entries.size} entries, ${catalog.texts.translations.size} languages")
+        println("UI metadata: ${entries.size} setting entries, ${navigation.size} navigation entries, ${catalog.texts.translations.size} languages")
     }
     private fun property(value: String) = value.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
     private fun json(value: Any?): String = when (value) {

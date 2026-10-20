@@ -17,6 +17,8 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -124,7 +126,8 @@ internal fun ThemeGroup(title: String = "", content: @Composable ColumnScope.() 
 internal fun ThemeDivider() { Box(Modifier.padding(start = 16.dp).fillMaxWidth().height(.5.dp).background(LocalColors.current.divider)) }
 
 @Composable
-internal fun ThemeRow(title: String, modifier: Modifier = Modifier, icon: ImageVector? = null, action: (() -> Unit)? = null, trailing: @Composable RowScope.() -> Unit = {}) {
+internal fun ThemeRow(title: String, modifier: Modifier = Modifier, icon: ImageVector? = null, action: (() -> Unit)? = null, summary: String = "", trailing: @Composable RowScope.() -> Unit = {}) {
+    val label: @Composable () -> Unit = { Column { ThemeText(title, size = if (LocalTheme.current == AppTheme.Coui) 16 else 17); if (summary.isNotBlank()) ThemeText(summary, size = 13, color = LocalColors.current.secondary) } }
     val start: @Composable () -> Unit = {
         if (icon != null) Icon(icon, null, Modifier.size(28.dp), tint = LocalColors.current.accent)
     }
@@ -133,21 +136,21 @@ internal fun ThemeRow(title: String, modifier: Modifier = Modifier, icon: ImageV
     }
     when (LocalTheme.current) {
         AppTheme.Material -> ListItem(
-            headlineContent = { ThemeText(title) },
+            headlineContent = label,
             modifier = modifier.then(if (action != null) Modifier.clickable(onClick = action) else Modifier),
             leadingContent = if (icon == null) null else start,
             trailingContent = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = end) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         // The string-title overloads force Medium, making body rows heavier than their values.
-        AppTheme.Miuix -> BasicComponent(modifier = modifier, startAction = if (icon == null) null else start, endActions = end, onClick = action) { ThemeText(title) }
-        AppTheme.Coui -> CouiComponent(modifier = modifier, startAction = if (icon == null) null else start, endActions = end, onClick = action) { ThemeText(title, size = 16) }
+        AppTheme.Miuix -> BasicComponent(modifier = modifier, startAction = if (icon == null) null else start, endActions = end, onClick = action) { label() }
+        AppTheme.Coui -> CouiComponent(modifier = modifier, startAction = if (icon == null) null else start, endActions = end, onClick = action) { label() }
         AppTheme.Cupertino -> Row(
             modifier.fillMaxWidth().heightIn(min = 56.dp).then(if (action != null) Modifier.clickable(onClick = action) else Modifier).padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (icon != null) start()
-            ThemeText(title, Modifier.weight(1f))
+            Box(Modifier.weight(1f)) { label() }
             trailing()
         }
     }
@@ -198,14 +201,15 @@ internal fun ThemeTextAction(title: String, action: () -> Unit, enabled: Boolean
 }
 
 @Composable
-internal fun ThemeInput(value: String, change: (String) -> Unit, label: String, integer: Boolean = false) {
-    val keyboard = KeyboardOptions(keyboardType = if (integer) KeyboardType.Number else KeyboardType.Text)
+internal fun ThemeInput(value: String, change: (String) -> Unit, label: String, integer: Boolean = false, secret: Boolean = false) {
+    val keyboard = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else if (integer) KeyboardType.Number else KeyboardType.Text)
+    val transformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None
     val modifier = Modifier.fillMaxWidth().semantics { contentDescription = label }
     when (LocalTheme.current) {
-        AppTheme.Material -> OutlinedTextField(value, change, modifier, label = { Text(label) }, singleLine = true, keyboardOptions = keyboard)
-        AppTheme.Cupertino -> CupertinoTextField(value, change, modifier, placeholder = { CupertinoText(label) }, singleLine = true, keyboardOptions = keyboard)
-        AppTheme.Miuix -> MiuixTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard)
-        AppTheme.Coui -> CouiTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard)
+        AppTheme.Material -> OutlinedTextField(value, change, modifier, label = { Text(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
+        AppTheme.Cupertino -> CupertinoTextField(value, change, modifier, placeholder = { CupertinoText(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
+        AppTheme.Miuix -> MiuixTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
+        AppTheme.Coui -> CouiTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
     }
 }
 

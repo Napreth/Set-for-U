@@ -41,6 +41,8 @@ internal class MainWindow : JFrame() {
         override fun saveWorkMode(mode: WorkMode) = appearance.writeWorkMode(mode)
         override fun readRootShell() = appearance.readRootShell()
         override fun saveRootShell(enabled: Boolean) = appearance.writeRootShell(enabled)
+        override fun readOwnPages() = appearance.readOwnPages()
+        override fun saveOwnPages(enabled: Boolean) = appearance.writeOwnPages(enabled)
         override fun createBridge(mode: WorkMode, serial: String, emulateShell: Boolean): IAdbBridge {
             if (serial.isBlank()) return object : IAdbBridge {
                 override val connectionState = MutableStateFlow(BridgeState.Disconnected)

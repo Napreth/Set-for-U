@@ -82,7 +82,7 @@ abstract class BridgeContract {
             }
             override suspend fun apply(context: SettingContext, desiredValue: SettingValue) = Unit
         }
-        val definition = SettingDefinition("test.device.probe", ValueType.Text, handler)
+        val definition = SettingDefinition("test.device.probe", ValueType.Text, { handler })
         var deployments = 0
         var processes = 0
         var artifact = ""
@@ -235,7 +235,7 @@ abstract class BridgeContract {
             }
             override suspend fun apply(context: SettingContext, desiredValue: SettingValue) = Unit
         }
-        val definition = SettingDefinition("test.device.protocol", ValueType.Text, handler)
+        val definition = SettingDefinition("test.device.protocol", ValueType.Text, { handler })
         val session = Core.open(bridge, SettingsCatalog(emptyMap(), entries = listOf(SettingEntry(definition, UiText.Literal(definition.id)))))
         try {
             val mismatch = session.settings.read(AppTarget(0, targetPackage), definition)

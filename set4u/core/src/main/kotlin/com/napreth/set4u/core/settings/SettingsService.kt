@@ -21,7 +21,7 @@ class SettingsService internal constructor(
 
     suspend fun read(target: SettingTarget, definition: SettingDefinition): SettingObservation {
         val registered = catalog.registry.resolve(definition)
-        return engine.read(target, registered.id, compatibility.handler(registered))
+        return engine.read(target, registered.id, compatibility.handler(registered, reading = true))
     }
 
     fun set(
@@ -35,8 +35,11 @@ class SettingsService internal constructor(
         val registered = catalog.registry.resolve(definition)
         val error = registered.validationError(desiredValue)
         require(error == null) { error.orEmpty() }
+        val retained = if (desiredValue is SettingValue.ActionValue) SettingValue.ActionValue(desiredValue.parameters.mapValues { (key, value) ->
+            if (registered.actionParameters[key]?.sensitive == true) "[redacted]" else value
+        }) else desiredValue
         return engine.submit(SettingOperation(
-            registered.id, target, desiredValue, compatibility.handler(registered), admissionKey, guard,
+            registered.id, target, desiredValue, compatibility.handler(registered), admissionKey, guard, retained,
         ))
     }
 }

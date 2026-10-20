@@ -37,8 +37,8 @@ internal class BluetoothHandler : SettingHandler {
     override val verificationPolicy = VerificationPolicy(24, 250)
     override suspend fun inspect(context: SettingContext): SettingSnapshot {
         val output = context.radioCommand("dumpsys", "bluetooth_manager")
-        val header = output.lineSequence().dropWhile { it.trim() != "Bluetooth Status" }.drop(1).takeWhile { it.isNotBlank() }.toList()
-        val state = header.singleOrNull { it.trim().startsWith("state:") }?.substringAfter(':')?.trim()
+        val header = output.lineSequence().dropWhile { !it.trim().removeSuffix(":").equals("Bluetooth Status", ignoreCase = true) }.drop(1).takeWhile { it.isNotBlank() }.toList()
+        val state = header.singleOrNull { it.trim().startsWith("state:", ignoreCase = true) }?.substringAfter(':')?.trim()
         return when (state) {
             "ON" -> SettingSnapshot(SettingValue.BooleanValue(true))
             "OFF", "BLE_ON" -> SettingSnapshot(SettingValue.BooleanValue(false))

@@ -40,7 +40,10 @@ data class NavigationRow(
     val detail: String = "",
     override val summary: String = "",
     override val icon: String? = null,
+    val availabilityPolicy: NavigationAvailabilityPolicy = NavigationAvailabilityPolicy.FollowPage,
 ) : Row
+
+enum class NavigationAvailabilityPolicy { FollowPage, ShowDisabled, IgnorePage }
 
 data class RowContainer(val id: String, val rows: List<Row>, val title: String = "", val summary: String = "")
 enum class EntryStyle { Default, Choices, Dropdown, Information }

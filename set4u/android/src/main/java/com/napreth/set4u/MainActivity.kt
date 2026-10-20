@@ -49,6 +49,8 @@ class MainActivity : ComponentActivity() {
             override fun saveWorkMode(mode: WorkMode) { modePreferences.edit().putString("workMode", if (mode == WorkMode.Root) "root" else "shell").apply() }
             override fun readRootShell() = modePreferences.getBoolean("rootShell", false)
             override fun saveRootShell(enabled: Boolean) { modePreferences.edit().putBoolean("rootShell", enabled).apply() }
+            override fun readOwnPages() = modePreferences.getBoolean("ownPages", false)
+            override fun saveOwnPages(enabled: Boolean) { modePreferences.edit().putBoolean("ownPages", enabled).apply() }
             override fun createBridge(mode: WorkMode, serial: String, emulateShell: Boolean): IAdbBridge = if (mode == WorkMode.Root) RootBridge(LocalProcessBridge(), emulateShell) else ShizukuBridge(applicationContext)
             override suspend fun connect(bridge: IAdbBridge, requestPermission: Boolean) {
                 when (bridge) {
@@ -62,7 +64,10 @@ class MainActivity : ComponentActivity() {
             override suspend fun openSystem(session: CoreSession, screen: SystemSettingsScreen) {
                 check(screen.requiredFeature?.let { packageManager.hasSystemFeature(it) } != false)
                 try { startActivity(Intent(screen.action)) }
-                catch (_: android.content.ActivityNotFoundException) { startActivity(Intent(screen.fallback)) }
+                catch (_: android.content.ActivityNotFoundException) {
+                    try { startActivity(screen.component?.let { Intent().setComponent(android.content.ComponentName.unflattenFromString(it)) } ?: Intent(screen.fallback)) }
+                    catch (_: android.content.ActivityNotFoundException) { startActivity(Intent(screen.fallback)) }
+                }
             }
             override fun openLink(url: String) { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             override fun license() = assets.open("LICENSE").bufferedReader().use { it.readText() }

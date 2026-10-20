@@ -41,11 +41,14 @@ class CoreSession internal constructor(
     val state = store.state
     private val shell = ShellExecutor(bridge)
     private val engine = ExecutionEngine(id, scope, shell, store, options, clock)
-    val compatibility = CompatibilityService(compatibilityRegistry, deviceProfileSource ?: DeviceInfoCollector(bridge, clock), ::requireOpen, com.napreth.set4u.core.bridge.ExecutionEnvironmentSource { bridge.environment() })
+    val compatibility = CompatibilityService(compatibilityRegistry, deviceProfileSource ?: DeviceInfoCollector(bridge, clock), ::requireOpen, com.napreth.set4u.core.bridge.ExecutionEnvironmentSource { bridge.environment() }, shell::execute, clock)
     internal val clock = clock
     suspend fun executionEnvironment() = bridge.environment()
     val settings = SettingsService(catalog, engine, compatibility)
-    val search = com.napreth.set4u.core.settings.presentation.SettingsSearchService(catalog, compatibility)
+    val handlers = com.napreth.set4u.core.execution.HandlerService(catalog.handlers, engine, compatibility)
+    val pages = PageAvailabilityService(catalog, compatibility, handlers)
+    val scanner = CompatibilityScanner(catalog.handlers, compatibility, id)
+    val search = com.napreth.set4u.core.settings.presentation.SettingsSearchService(catalog, compatibility, pages)
     val navigation = com.napreth.set4u.core.settings.SystemSettingsNavigator(shell)
     val viewModels = ViewModelFactory(this)
 

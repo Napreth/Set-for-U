@@ -27,6 +27,7 @@ class AppearanceTest {
         preferences.writeLanguage(AppLanguage.English)
         preferences.writeWorkMode(WorkMode.Root)
         preferences.writeRootShell(true)
+        preferences.writeOwnPages(true)
         assertEquals(AppTheme.Miuix, AppearancePreferences(path).read())
         preferences.write(AppTheme.Material)
         assertEquals(AppTheme.Material, AppearancePreferences(path).read())
@@ -34,6 +35,7 @@ class AppearanceTest {
         assertEquals(AppLanguage.English, AppearancePreferences(path).readLanguage())
         assertEquals(WorkMode.Root, AppearancePreferences(path).readWorkMode())
         assertTrue(AppearancePreferences(path).readRootShell())
+        assertTrue(AppearancePreferences(path).readOwnPages())
         Files.writeString(path, "theme=old-removed-theme\n")
         assertEquals(AppTheme.Cupertino, AppearancePreferences(path).read())
         Files.list(path.parent).use { assertEquals(1, it.count()) }

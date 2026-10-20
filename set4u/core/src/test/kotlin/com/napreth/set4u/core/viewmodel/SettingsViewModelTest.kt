@@ -118,7 +118,7 @@ class SettingsViewModelTest {
             vm.enter().join()
             val requestsBefore = bridge.requests.size
             assertNull(vm.setValue("sample.flag", SettingValue.TextValue("not a boolean")))
-            assertNotNull(vm.state.value.error)
+            assertNotNull(vm.state.value.rejection)
             assertEquals(requestsBefore, bridge.requests.size)
             assertTrue(bridge.writes.isEmpty())
             vm.close()

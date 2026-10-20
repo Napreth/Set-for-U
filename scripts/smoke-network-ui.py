@@ -104,6 +104,18 @@ def main():
             time.sleep(0.25)
         raise AssertionError("WLAN state did not match the UI request")
 
+    try:
+        original_mode_xml = ET.fromstring(adb("shell", "run-as", "com.napreth.set4u", "cat", "shared_prefs/MainActivity.xml"))
+    except subprocess.CalledProcessError:
+        original_mode_xml = ET.fromstring("<map/>")
+    own_before = next((n.get("value") == "true" for n in original_mode_xml if n.get("name") == "ownPages"), False)
+    def own_pages(enabled):
+        tap("关于选项卡"); tap("关于选项卡"); tap("调试")
+        node = next(n for n in tree().iter("node") if n.get("checkable") == "true" and n.get("content-desc") == "始终使用内置设置页")
+        if (node.get("checked") == "true") != enabled:
+            b = [int(n) for n in re.findall(r"\d+", node.get("bounds"))]
+            adb("shell", "input", "tap", str((b[0]+b[2])//2), str((b[1]+b[3])//2))
+        adb("shell", "input", "keyevent", "BACK")
     before = wifi()
     bluetooth_before = None
     mobile_before = None
@@ -117,6 +129,7 @@ def main():
             scroll_to("Language")
             tap("Language")
             tap("简体中文")
+        own_pages(True)
         tap("工作模式选项卡")
         try:
             find("已启用", attempts=2)
@@ -167,9 +180,9 @@ def main():
         tap("设置选项卡")
         find("网络与通信")
         tap("WLAN")
-        node, _ = find("使用 WLAN")
+        node, _ = find("启用 WLAN")
         # The switch's content description equals its setting title.
-        switches = [node for node in tree().iter("node") if node.get("checkable") == "true"]
+        switches = [node for node in tree().iter("node") if node.get("checkable") == "true" and node.get("content-desc") == "启用 WLAN"]
         assert len(switches) == 1 and switches[0].get("enabled") == "true"
         assert switches[0].get("checked") == str(before).lower()
         bounds = [int(value) for value in re.findall(r"\d+", switches[0].get("bounds"))]
@@ -177,7 +190,7 @@ def main():
         wait_wifi(not before)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            current = radio_switch("使用 WLAN", writable=False)
+            current = radio_switch("启用 WLAN", writable=False)
             if current.get("enabled") == "true" and current.get("checked") == str(not before).lower():
                 break
             time.sleep(.3)
@@ -187,10 +200,13 @@ def main():
         adb("shell", "input", "keyevent", "BACK")
         if args.radios:
             scroll_to("蓝牙")
+            tap("蓝牙")
             bluetooth_before = radio_switch("蓝牙").get("checked") == "true"
+            adb("shell", "input", "keyevent", "BACK")
             features = adb("shell", "pm", "list", "features").splitlines()
             assert "feature:android.hardware.nfc" not in features, "This UI test expects an AVD without NFC"
             assert not any(node.get("text") == "NFC" or node.get("content-desc") == "NFC" for node in tree().iter("node"))
+            tap("蓝牙")
             change_radio("蓝牙", not bluetooth_before)
             change_radio("蓝牙", bluetooth_before)
             screenshot("bluetooth")
@@ -229,6 +245,7 @@ def main():
         find("指定提供商")
         screenshot("private-dns")
     finally:
+        own_pages(own_before)
         adb("shell", "svc", "wifi", "enable" if before else "disable")
         wait_wifi(before)
         if bluetooth_before is not None:

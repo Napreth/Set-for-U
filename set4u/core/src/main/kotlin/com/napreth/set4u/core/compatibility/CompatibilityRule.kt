@@ -113,6 +113,7 @@ private fun unknown(field: DeviceField) = RuleMatch(MatchState.Unknown, "Unknown
 sealed interface RuleDecision {
     data class Use(val operationId: String) : RuleDecision { init { require(operationId.isNotBlank()) } }
     data class Unsupported(val reason: String) : RuleDecision { init { require(reason.isNotBlank()) } }
+    data class Absent(val reason: String) : RuleDecision { init { require(reason.isNotBlank()) } }
 }
 
 class CompatibilityRule(
@@ -121,7 +122,9 @@ class CompatibilityRule(
     val condition: DeviceCondition,
     val decision: RuleDecision,
     replaces: Set<String> = emptySet(),
+    val scope: CompatibilityScope = CompatibilityScope(),
 ) {
+    val capabilityId get() = settingId
     val replaces: Set<String> = Collections.unmodifiableSet(LinkedHashSet(replaces))
     init { require(id.isNotBlank() && settingId.isNotBlank()) }
 }
@@ -130,18 +133,26 @@ sealed interface CompatibilityResolution {
     data class Supported(val operationId: String, val ruleId: String) : CompatibilityResolution
     data class Unsupported(val reason: String, val ruleId: String? = null) : CompatibilityResolution
     data class Unknown(val reason: String) : CompatibilityResolution
+    data class Absent(val reason: String, val ruleId: String) : CompatibilityResolution
 }
 
 /** Explicit replacement relationships resolve overrides; registration order never selects an operation. */
-class CompatibilityRegistry(rules: List<CompatibilityRule>, policies: Map<String, CapabilityPolicy> = emptyMap()) {
+class CompatibilityRegistry(rules: List<CompatibilityRule>, policies: Map<String, CapabilityPolicy> = emptyMap(),
+    resolutionRules: List<ResolutionRule> = emptyList(), evidence: List<CompatibilityEvidence> = emptyList()) {
+    internal val resolutionRules = ResolutionRules(resolutionRules)
+    internal val needsResolutionProfile = resolutionRules.any { it.condition.needsProfile || it.scope.device.needsProfile }
+    private val resolutionNeedsEnvironment = resolutionRules.any { it.scope.identities.isNotEmpty() || it.scope.uid != null }
+    internal val evidence: List<CompatibilityEvidence> = Collections.unmodifiableList(ArrayList(evidence))
     val policies: Map<String, CapabilityPolicy> = Collections.unmodifiableMap(policies.mapValues { (_, policy) -> policy.copy(
         identities = Collections.unmodifiableSet(LinkedHashSet(policy.identities)), permissions = Collections.unmodifiableSet(LinkedHashSet(policy.permissions)),
+        probes = Collections.unmodifiableList(ArrayList(policy.probes)),
     ) })
     private val rules = rules.toList()
     private val byId = rules.associateBy { it.id }
     private val replaced = mutableMapOf<String, Set<String>>()
     init {
         require(byId.size == rules.size) { "Duplicate compatibility rule ID" }
+        policies.values.forEach { policy -> require(policy.probes.all { it.id.isNotBlank() } && policy.probes.map { it.id }.distinct().size == policy.probes.size) { "Probe IDs must be nonblank and unique within a capability" } }
         fun ancestors(id: String, visiting: Set<String>): Set<String> {
             require(id !in visiting) { "Compatibility replacement cycle at $id" }
             val rule = byId.getValue(id)
@@ -154,10 +165,17 @@ class CompatibilityRegistry(rules: List<CompatibilityRule>, policies: Map<String
         rules.forEach { replaced[it.id] = ancestors(it.id, emptySet()) }
     }
     fun hasRules(settingId: String) = rules.any { it.settingId == settingId }
-    fun needsProfile(settingId: String) = rules.any { it.settingId == settingId && it.condition.needsProfile }
+    internal fun needsEnvironment(id: String) = resolutionNeedsEnvironment || rules.any { it.settingId == id && (it.scope.identities.isNotEmpty() || it.scope.uid != null) } || evidence.any { it.capabilityId == id && (it.scope.identities.isNotEmpty() || it.scope.uid != null) }
+    internal fun scopeFor(ruleId: String?) = byId[ruleId]?.scope ?: CompatibilityScope()
+    fun needsProfile(settingId: String) = rules.any { it.settingId == settingId && (it.condition.needsProfile || it.scope.device.needsProfile) }
 
-    fun resolve(settingId: String, profile: DeviceProfile): CompatibilityResolution {
-        val results = rules.filter { it.settingId == settingId }.map { it to it.condition.match(profile) }
+    fun resolve(settingId: String, profile: DeviceProfile,
+        target: com.napreth.set4u.core.session.SettingTarget = com.napreth.set4u.core.session.DeviceTarget(),
+        environment: com.napreth.set4u.core.bridge.ExecutionEnvironment = com.napreth.set4u.core.bridge.ExecutionEnvironment(com.napreth.set4u.core.bridge.BridgeTransport.Unknown, null),
+    ): CompatibilityResolution {
+        val results = rules.filter { it.settingId == settingId }.map { rule ->
+            rule to rule.scope.match(profile, target, environment, rule.condition)
+        }
         val matches = results.filter { it.second.state == MatchState.Match }.map { it.first }
         val suppressed = matches.flatMap { replaced.getValue(it.id) }.toSet()
         val uncertain = results.filter { it.second.state == MatchState.Unknown && it.first.id !in suppressed }
@@ -168,6 +186,7 @@ class CompatibilityRegistry(rules: List<CompatibilityRule>, policies: Map<String
         return when (val decision = rule.decision) {
             is RuleDecision.Use -> CompatibilityResolution.Supported(decision.operationId, rule.id)
             is RuleDecision.Unsupported -> CompatibilityResolution.Unsupported(decision.reason, rule.id)
+            is RuleDecision.Absent -> CompatibilityResolution.Absent(decision.reason, rule.id)
         }
     }
     companion object { val Empty = CompatibilityRegistry(emptyList()) }

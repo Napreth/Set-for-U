@@ -30,8 +30,11 @@ class ThemeRenderingTest {
                 val scene = ImageComposeScene(620, 800, Density(1f), coroutineContext = Dispatchers.Swing.immediate) { Set4uApp(controller) }
                 try {
                     val image = scene.render(1_000_000_000L)
+                    assertTrue(scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }.containsAll(listOf("外观", "语言", "调试")))
+                    controller.showAbout(AboutScreen.Appearance)
+                    scene.render(1_100_000_000L).close()
                     val texts = scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }
-                    assertTrue("Missing app preferences in $theme: $texts", listOf("界面风格", "主题", "语言", theme.title).all { it in texts })
+                    assertTrue("Missing app preferences in $theme: $texts", listOf("界面风格", "主题", theme.title).all { it in texts })
                     val directory = File(root(), "build/reports/themes-ui").apply { mkdirs() }
                     image.encodeToData()!!.use { File(directory, "${theme.id}-${mode.id}-desktop.png").writeBytes(it.bytes) }
                     image.close()
@@ -47,7 +50,7 @@ class ThemeRenderingTest {
                     controller.selectLanguage(AppLanguage.English)
                     scene.render(1_800_000_000L).close()
                     val english = scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }
-                    assertTrue("Missing translated app preferences: $english", listOf("About", "Interface style", "Theme", "Language").all { it in english })
+                    assertTrue("Missing translated app preferences: $english", listOf("Appearance", "Interface style", "Theme").all { it in english })
                     controller.showLicense()
                     // Register the overlay, compose its host, then advance its entrance animation.
                     repeat(6) { frame -> scene.render(2_000_000_000L + frame * 500_000_000L).close() }
@@ -55,6 +58,13 @@ class ThemeRenderingTest {
                     assertTrue("Dialog is not visible in $theme: $dialog", "MIT License" in dialog && "Close" in dialog)
                     controller.dismissDialog()
                     scene.render(5_000_000_000L).close()
+                    controller.setOwnPages(true)
+                    controller.selectTab(0); controller.navigate("network.wifi"); controller.connectWifi()
+                    repeat(4) { frame -> scene.render(5_200_000_000L + frame * 100_000_000L).close() }
+                    val formNodes = scene.semanticsOwners.flatMap { nodes(it.unmergedRootSemanticsNode) }
+                    assertTrue("Wireless form is missing in $theme", listOf("Connect to network", "Network name", "Security").all { label -> label in formNodes.flatMap(::text) })
+                    assertTrue("Password field must be protected in $theme", formNodes.any { it.config.getOrNull(SemanticsProperties.Password) != null })
+                    controller.dismissDialog()
                     controller.selectTab(1)
                     scene.render(6_000_000_000L).close()
                     val workTexts = scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }
@@ -70,7 +80,10 @@ class ThemeRenderingTest {
                     assertTrue("Action button must be on the right", actionLabel.boundsInRoot.right < enable.boundsInRoot.left)
                     controller.selectMode(WorkMode.Root)
                     repeat(3) { frame -> scene.render(7_000_000_000L + frame * 500_000_000L).close() }
-                    assertTrue(scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }.contains("Run as shell using root"))
+                    assertFalse(scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }.contains("Run as shell using root"))
+                    controller.showAbout(AboutScreen.Debug)
+                    scene.render(8_500_000_000L).close()
+                    assertTrue(scene.semanticsOwners.flatMap { text(it.unmergedRootSemanticsNode) }.containsAll(listOf("Run as shell using root", "Always use built-in settings pages")))
                     scene.render(9_000_000_000L).use { preview -> preview.encodeToData()!!.use { File(directory, "${theme.id}-${mode.id}-work-mode-desktop.png").writeBytes(it.bytes) } }
                 } finally { scene.close(); controller.close() }
             }
