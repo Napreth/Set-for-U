@@ -26,12 +26,13 @@ import com.napreth.set4u.core.viewmodel.*
 import com.slapps.cupertino.CupertinoScaffold
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import io.github.suqi8.coui.kmp.basic.Scaffold as CouiScaffold
+import com.napreth.set4u.ui.form.FormRenderers
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 
 /** The same pages and interactions on Android and desktop, using the selected component library. */
 @Composable
-fun Set4uApp(controller: AppController, renderers: RowRenderers = RowRenderers.Empty, icon: @Composable () -> Unit = {}) {
+fun Set4uApp(controller: AppController, renderers: RowRenderers = RowRenderers.Empty, formRenderers: FormRenderers = FormRenderers.Empty, icon: @Composable () -> Unit = {}) {
     val state by controller.state.collectAsState()
     val dark = when (state.themeMode) { ThemeMode.System -> isSystemInDarkTheme(); ThemeMode.Light -> false; ThemeMode.Dark -> true }
     SideEffect { controller.platform.applyDarkMode(dark) }
@@ -54,7 +55,7 @@ fun Set4uApp(controller: AppController, renderers: RowRenderers = RowRenderers.E
                             }
                             Spacer(Modifier.height(if (state.theme == AppTheme.Cupertino) 100.dp else 16.dp))
                         }
-                        if (state.theme == AppTheme.Miuix || state.theme == AppTheme.Coui) state.dialog?.let { dialog -> key(dialog) { ThemeDialog(dialog) { controller.dismissDialog(dialog) } } }
+                        if (state.theme == AppTheme.Miuix || state.theme == AppTheme.Coui) state.dialog?.let { dialog -> key(dialog) { ThemeDialog(dialog, { controller.dismissDialog(dialog) }, formRenderers) } }
                     }
                 }
             }
@@ -73,7 +74,7 @@ fun Set4uApp(controller: AppController, renderers: RowRenderers = RowRenderers.E
                     AppTheme.Coui -> CouiScaffold(topBar = heading, bottomBar = tabs, containerColor = LocalColors.current.background, contentWindowInsets = WindowInsets(0), content = content)
                 }
                 }
-                if (inlineDialog) state.dialog?.let { dialog -> key(dialog) { ThemeDialog(dialog) { controller.dismissDialog(dialog) } } }
+                if (inlineDialog) state.dialog?.let { dialog -> key(dialog) { ThemeDialog(dialog, { controller.dismissDialog(dialog) }, formRenderers) } }
                 state.menu?.let { AppMenuOverlay(it, controller::dismissMenu, controller::selectMenu) }
                 state.notice?.let { notice ->
                     LaunchedEffect(notice) { kotlinx.coroutines.delay(5_000); controller.dismissNotice() }

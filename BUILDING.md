@@ -19,7 +19,7 @@ sh scripts/build.sh --targets linux-x64 android --build-type release
 
 --build-type 可选 debug、release，默认 debug。测试版版本名为 0.1.0-debug，Android 使用标准 debug 测试签名；正式版为 0.1.0，Android 不启用调试、不配置签名，输出 unsigned APK。正式 APK 需要签名后才能安装。桌面包的版本名同样遵循此规则，Windows EXE 的数值产品版本为 0.1.0。
 
---targets 可选 windows-x64、linux-x64、android；--skip-tests 省略 JVM 测试，--skip-build 重新包装对应类型的已有 Gradle 输出。普通构建不连接设备，AVD 测试单独使用 README 中的 Test-Bridges.ps1。
+--targets 可选 windows-x64、linux-x64、android；--skip-tests 省略 JVM 测试，--skip-build 重新包装对应类型的已有 Gradle 输出。普通构建不连接设备，AVD 测试单独使用 scripts/Test-Bridges.ps1。
 
 产物分别位于 build/dist/debug 和 build/dist/release，每种类型有独立的打包暂存目录和校验清单。
 
@@ -37,11 +37,11 @@ sh scripts/build.sh --targets linux-x64 android --build-type release
 
 Windows EXE 启动器通过 jpackage 在 Windows 上创建。Linux 便携包直接组装 JRE、应用 JAR、ADB 和启动脚本，保留文件权限与符号链接，因此也可以在 Windows 上生成。构建不会清空整个 build 目录，只替换对应的打包暂存目录。
 
-两端当前提供设置、连接和关于选项卡。Android 工作模式页支持 Shizuku 和本机 su，桌面连接页支持 ADB 和经 ADB 的 root，设备信息位于连接页中；软件更新入口打开 GitHub Releases，源代码入口打开项目仓库。两端使用 Compose，共用 set4u/ui 中的页面与主题适配代码，复用 Core 的页面、定义与 ViewModel。桌面端还可以在命令行读取目标设备信息。
+两端当前提供设置、工作模式和关于选项卡。Android 工作模式页支持 Shizuku 和本机 su，桌面端支持 ADB 和经 ADB 的 root，设备信息从工作模式页进入独立页面；软件更新入口打开 GitHub Releases，源代码入口打开项目仓库。两端使用 Compose，共用 set4u/ui 中的页面与主题适配代码，复用 Core 的页面、定义与 ViewModel。桌面端还可以在命令行读取目标设备信息。
 
 界面使用 Kotlin 2.4.10、Compose Multiplatform 1.11.1、Material 3 1.9.0、Compose Cupertino 2.3.1、Miuix 0.8.5、COUI 1.1.0 和 Backdrop 2.0.0-alpha02。固定版本是为了保持 Compose 与 Kotlin 二进制兼容；Miuix 和 Backdrop 仍可能变更 API，升级时需要验证四套风格。依赖来自 Google Maven 和 Maven Central，不再使用 JitPack。DeviceTask 单独使用 Maven 中的 D8/R8 9.1.56，以支持 Kotlin 2.4 元数据；Android SDK Build Tools 仍用于 APK 构建。
 
-主题入口为“关于 → 应用设置 → 界面风格”，默认 Cupertino。Android 最低 API 23；API 31 以下使用不透明 Cupertino 底栏，API 31 起支持背景模糊，折射还取决于运行时 Shader 支持。桌面包包含 Windows 和 Linux 的 Skiko 运行库，通过运行平台选择加载，不要求安装 Java。Cupertino、Miuix 和 COUI 是社区组件库，并非 Apple、小米或 OPPO 的官方系统控件。APK 的 assets/licenses、桌面 JAR 的 licenses 目录和便携包的 licenses 目录包含组件说明与许可证。
+主题入口为“关于 → 外观 → 界面风格”，默认 Cupertino。Android 最低 API 23；API 31 以下使用不透明 Cupertino 底栏，API 31 起支持背景模糊，折射还取决于运行时 Shader 支持。桌面包包含 Windows 和 Linux 的 Skiko 运行库，通过运行平台选择加载，不要求安装 Java。Cupertino、Miuix 和 COUI 是社区组件库，并非 Apple、小米或 OPPO 的官方系统控件。APK 的 assets/licenses、桌面 JAR 的 licenses 目录和便携包的 licenses 目录包含组件说明与许可证。
 
 ```text
 Set-for-U-cli.cmd --device emulator-5580 --profile
@@ -53,6 +53,20 @@ Set-for-U-cli.cmd --self-test --gui
 设备信息始终通过目标设备的 Bridge 采集。便携包优先使用自带 ADB，开发时也可以在 CLI 传 --adb 指定可执行文件。
 
 .github/workflows/build.yml 分别构建 Windows、Linux 的测试版和正式版，并执行 Linux 便携包自检。本机验证包括 Windows 运行时、GUI 创建、连接 AVD，以及 Android APK 启动、Shizuku 授权和设备信息页。Linux 命令行自检及 ADB 在 WSL 的临时 Ubuntu 根目录中验证；Linux GUI 尚未实测。Core、Desktop、Android 的 AVD 测试结果见 build/reports/bridge-avd/summary.json。
+
+## AVD 测试
+
+Bridge Contract 使用专用 AVD，adb、PowerShell 7 和构建环境需要可用。脚本检查模拟器属性，要求 adbd 以 shell 身份运行，并安装 Shizuku 和测试目标应用。默认目标为 Do I Have（com.napreth.doihave）；首次运行可传入两个 APK，后续省略 APK 参数即可复用已安装的应用。
+
+```powershell
+.\scripts\Test-Bridges.ps1 -Serial emulator-5580 `
+    -TargetApk 'C:\apks\do-i-have.apk' `
+    -ShizukuApk 'C:\apks\shizuku.apk'
+```
+
+测试会构建并执行桌面与 Android 的共享 Contract，设置修改在 finally 中恢复，报告位于 build/reports/bridge-avd。-TargetPackage 可指定其他测试包。具备 su 的测试 AVD 可额外设置 SET4U_TEST_ROOT=1，追加 root Contract；应用自身仍需获得 root 授权。
+
+scripts/smoke-*-ui.py 检查实际界面，具体脚本与覆盖范围见下文。root 无线检查需要应用已获授权，不能用 adb shell 的 root 身份代替。多个 UIAutomator 脚本应顺序运行。
 
 ## DeviceTask 构建与调用
 
@@ -171,3 +185,7 @@ WLAN 配置通过 WifiTask 调用系统 Wi-Fi 服务，协议版本为 2。WifiC
 `python scripts/smoke-wifi-settings-ui.py --serial emulator-5554` 要求本机 root 已授权，检查首页、详情、代理和 IP 表单、二维码、高级 WLAN 设置，并通过界面修改和恢复开关。报告与截图位于 build/reports/wifi-settings-ui。它不安装证书，也不连接额外的 WLAN 或直连设备。
 
 API 37 AVD 已完成四套风格的实际点击检查，覆盖网络唯一显示、详情、代理和静态 IP 表单、偏好与高级页面。自动连接、公共网络通知、自动开启和扫描开关通过界面修改后回读，结束恢复原值；最终 APK 也验证了首次进入时的 WLAN 开关状态，以及证书安装和 WLAN 直连的系统页面跳转。`--read-only` 可跳过开关修改。Windows 便携包使用自带 Java 21 通过了表单与二维码的三项定向测试；两种构建类型的 APK、Windows 和 Linux 便携包均已更新。
+
+FormSessionTest 覆盖隐藏草稿、字段与跨字段校验、提交互斥、取消、关闭及敏感值的字符串表示。WirelessFormsTest 检查 64 位 WPA2 密钥、条件字段的提交参数和重新编辑时的初始值，FormRenderingTest 检查四套风格的内嵌、自定义与默认字段渲染，以及对话框编辑会话的生命周期。普通本地测试不会提交设备设置。
+
+统一表单本轮 Core 173 项、桌面本地 19 项测试通过。便携包自带 Java 21 通过五项表单与二维码测试，API 37 AVD 通过四套风格的空网络名校验、开放网络密码显隐、代理和静态 IP 表单检查。设备检查使用 `--read-only`，没有提交有效的网络修改，结束恢复原外观与工作模式。记录保存在 build/reports/forms。

@@ -153,6 +153,11 @@ def main():
             assert len([n for n in tree().iter("node") if n.get("text") == ssid]) == 1
             assert not nodes("其他网络") and not nodes("允许连接 WEP 网络")
             capture(f"{style}-overview")
+            tap("添加网络"); find("连接网络"); tap("保存"); find("网络名称应为 1–32 字节")
+            capture(f"{style}-connection-validation")
+            tap("WPA2-Personal"); tap("无"); tree(True)
+            assert not nodes("密码"), "Open networks must not collect a password"
+            find("隐藏网络"); tap("取消"); find("启用 WLAN")
             tap(f"网络详情：{ssid}"); find("自动连接"); find("断开连接")
             capture(f"{style}-details")
             if not args.read_only and not report["verifiedUiChanges"]:

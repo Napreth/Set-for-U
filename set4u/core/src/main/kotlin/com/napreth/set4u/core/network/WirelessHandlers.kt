@@ -54,9 +54,7 @@ internal class WirelessActionHandler(private val kind: WirelessKind) : SettingHa
         require(op in allowed)
         if (kind == WirelessKind.Wifi && op in setOf("connect", "connectSaved")) check(latest.fields["enabled"] == "true") { "请先开启 WLAN" }
         if (kind == WirelessKind.Wifi && op == "connect") {
-            val ssid = requireNotNull(p["ssid"]); require(ssid.toByteArray(Charsets.UTF_8).size in 1..32) { "网络名称应为 1–32 字节" }
-            require(p["security"] in setOf("open", "owe", "wpa2", "wpa3", "wep")) { "此安全类型请使用系统设置" }
-            if (p["security"] in setOf("wpa2", "wpa3", "wep")) WifiConfigurationValues.password(p.getValue("security"), p["password"].orEmpty())
+            WirelessInputValues.connect(p)
             if (p["security"] == "wep") check(latest.fields["wepSupported"] != "false" && latest.fields["wep"] != "false") { "请先在高级 WLAN 设置中允许 WEP 网络" }
         }
         if (kind == WirelessKind.Wifi && op == "configure") {
@@ -71,10 +69,9 @@ internal class WirelessActionHandler(private val kind: WirelessKind) : SettingHa
             check(latest.fields[p["option"]] in setOf("true", "false")) { "此 Android 版本不支持这项设置" }
             if (p["option"] == "wep") check(latest.fields["wepSupported"] == "true") { "此设备不支持 WEP" }
         }
-        if (kind == WirelessKind.Bluetooth && op == "rename") require(p["name"].orEmpty().toByteArray(Charsets.UTF_8).size in 1..248)
+        if (kind == WirelessKind.Bluetooth && op == "rename") WirelessInputValues.bluetoothName(p["name"].orEmpty())
         if (kind == WirelessKind.Hotspot && op == "configure") {
-            require(p["ssid"].orEmpty().toByteArray(Charsets.UTF_8).size in 1..32)
-            require(p["password"].orEmpty().length in 8..63) { "密码应为 8–63 个字符" }
+            WirelessInputValues.hotspot(p)
             require(latest.fields["wifi"] == "false") { "请先关闭热点再修改配置" }
         }
         request = WirelessRequest(kind, op, p - "operation")

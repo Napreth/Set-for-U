@@ -9,7 +9,7 @@ Core、Android、Desktop 三个构建模块保持不变。Core 处理业务、�
 | Desktop | set4u/desktop | Compose Desktop 宿主、ADB、经 ADB 的 su、桌面集成 |
 | 共享界面源码 | set4u/ui | Compose 页面、主题组件、应用导航与会话生命周期 |
 
-Core 的主要包为 settings、settings/presentation、viewmodel、localization、metadata、compatibility、execution、bridge、device 和 session。业务实现继续按功能放置，例如 network；设备任务可以留在所属业务目录，不强制集中到 device。共享 ViewModel 放在 viewmodel。
+Core 的主要包为 settings、settings/presentation、form、viewmodel、localization、metadata、compatibility、execution、bridge、device 和 session。业务实现继续按功能放置，例如 network；设备任务可以留在所属业务目录，不强制集中到 device。共享 ViewModel 放在 viewmodel。
 
 Android 和 Desktop 都使用 Compose。set4u/ui 是两个应用共同编译的源码目录，不依赖 Android 或 Swing API；三个构建模块保持不变。AppController 管理选项卡、页面导航、SettingsViewModel 和 Session 生命周期，AppPlatform 提供 Bridge、只读设备信息采集、外部链接、系统设置入口与本机配置读写。页面操作仍通过共享 ViewModel 提交，组件库不参与准入与执行。
 
@@ -81,6 +81,16 @@ SettingsPage 实现 AvailabilityProbe，可重写 assess。每轮页面加载创
 动态事件必须携带当前 Row token。token 包含页面代次、条目和数据版本，旧列表中的点击不能作用于复用 ID 的新 Row。提交时检查当前绑定与有效期，排队后在读取前和修改前再次检查；新快照、过期或页面关闭都能阻止尚未开始的旧操作。相同值但不同动态准入标识的请求不会错误共用 Deferred。静态页面关闭不会取消已经交给 Session 的普通修改。
 
 动态列表不为过期自动启动后台计时服务，最终准入检查使用 Session 时钟。DynamicEntriesTest 用三个网络验证模型、参数、版本失效和队列期限，生产页面只展示实际扫描结果。
+
+## 表单
+
+`core/form` 保存 FormDefinition、FormField、FormValidator 和 FormSession，`ui/form` 负责 Compose 渲染。业务表单跟随功能放置，无线表单在 `network/form`，普通设置输入在 `settings/form`。表单不属于 SettingEntry，也不注册设置能力；它收集参数并生成类型明确的请求，提交回调仍通过原有 Handler 和设置引擎完成操作与回读。
+
+字段提供文本、密码、开关和选择类型，选择可渲染为下拉或单选。选项使用稳定 ID，标题、选项文案与校验消息由宿主翻译。条件和校验只读取表单值，不访问设备；字段校验通过后再运行跨字段校验。Wi-Fi 连接、代理、IP、密码、蓝牙名称和热点配置使用这套模型，表单与 Handler 共用业务输入检查。
+
+一次编辑创建一个 FormSession，StateFlow 发布草稿、错误、Dirty 和提交状态。隐藏字段保留草稿，但不参与校验，也不能由请求构造器读取；禁用字段保留值并禁止编辑。外部观测不会自动覆盖草稿，重新编辑时由页面用最新观测创建会话。提交期间禁止重复提交，提交回调返回后结束本轮编辑；这里的提交成功不代表设备操作已验证。关闭表单释放草稿，不取消已经交给设置引擎的操作。
+
+FormRenderer 可以放在对话框或页面内，不持有设备状态。FormRenderers 按表单 ID 注册私有字段组件，未注册的渲染键对标准字段使用默认呈现。AppController 管理对话框内表单的生命周期；页面内嵌表单由页面持有和关闭会话。表单及其状态的默认字符串表示不打印字段值，密码不保存到本机偏好，也不进入普通日志。
 
 ## 文案与搜索
 

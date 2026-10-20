@@ -19,7 +19,7 @@ internal class AppStrings(val locale: String) {
             "Architecture" to "处理器架构", "Page size" to "内存页大小",
         )
         private val english = mapOf(
-            "此设备不支持随机 MAC 地址" to "This device does not support MAC randomization",
+            "即使未扫描到该WiFi也尝试连接" to "Try to connect even if this Wi-Fi network isn't found in a scan",
             "网络" to "Networks", "WLAN 详情" to "WLAN details", "高级 WLAN 设置" to "Advanced WLAN settings",
             "自动开启 WLAN" to "Turn on WLAN automatically", "附近有已保存的网络时自动开启 WLAN" to "Turn on WLAN near saved networks",
             "附近有公共网络时发出通知" to "Notify about public networks", "安装证书" to "Install certificates", "WLAN 直连" to "Wi-Fi Direct",
@@ -66,6 +66,9 @@ internal class AppStrings(val locale: String) {
             "添加网络" to "Add network", "连接网络" to "Connect to network", "安全性" to "Security", "隐藏网络" to "Hidden network", "是" to "Yes", "否" to "No",
             "网络名称应为 1–32 字节" to "Network names must contain 1–32 UTF-8 bytes", "密码应为 8–63 个字符" to "Passwords must contain 8–63 characters",
             "请输入有效的设备名称" to "Enter a valid device name",
+            "增强型开放网络" to "Enhanced Open", "此表单组件暂不可用" to "This input component is unavailable",
+            "无法生成请求，请检查输入" to "Unable to prepare the request. Check the input.",
+            "无法提交，请重新打开页面后重试" to "Unable to submit. Reopen the page and try again.",
             "应用设置" to "App settings", "界面风格" to "Interface style", "主题" to "Theme", "语言" to "Language",
             "跟随系统" to "System default", "浅色" to "Light", "深色" to "Dark",
             "版本" to "Version", "软件更新" to "Software updates", "源代码" to "Source code", "许可证" to "License",

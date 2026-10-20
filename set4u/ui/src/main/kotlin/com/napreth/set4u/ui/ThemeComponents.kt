@@ -201,15 +201,15 @@ internal fun ThemeTextAction(title: String, action: () -> Unit, enabled: Boolean
 }
 
 @Composable
-internal fun ThemeInput(value: String, change: (String) -> Unit, label: String, integer: Boolean = false, secret: Boolean = false) {
+internal fun ThemeInput(value: String, change: (String) -> Unit, label: String, integer: Boolean = false, secret: Boolean = false, enabled: Boolean = true) {
     val keyboard = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else if (integer) KeyboardType.Number else KeyboardType.Text)
     val transformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None
     val modifier = Modifier.fillMaxWidth().semantics { contentDescription = label }
     when (LocalTheme.current) {
-        AppTheme.Material -> OutlinedTextField(value, change, modifier, label = { Text(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
-        AppTheme.Cupertino -> CupertinoTextField(value, change, modifier, placeholder = { CupertinoText(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
-        AppTheme.Miuix -> MiuixTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
-        AppTheme.Coui -> CouiTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation)
+        AppTheme.Material -> OutlinedTextField(value, change, modifier, label = { Text(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation, enabled = enabled)
+        AppTheme.Cupertino -> CupertinoTextField(value, change, modifier, placeholder = { CupertinoText(label) }, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation, enabled = enabled)
+        AppTheme.Miuix -> MiuixTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation, enabled = enabled)
+        AppTheme.Coui -> CouiTextField(value, change, modifier, label = label, singleLine = true, keyboardOptions = keyboard, visualTransformation = transformation, enabled = enabled)
     }
 }
 

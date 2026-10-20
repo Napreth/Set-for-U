@@ -27,6 +27,7 @@ class WifiPresentationTest {
             for (theme in AppTheme.entries) {
                 val controller = AppController(Platform(), Dispatchers.Swing.immediate)
                 controller.selectTheme(theme)
+                controller.setOwnPages(true); controller.navigate("network.wifi")
                 val network = WifiNetwork("Demo", "open", WirelessItem("1", "Demo", "saved", properties = mapOf("proxyMode" to "none", "ipMode" to "dhcp")))
                 controller.editWifiProxy(network)
                 val scene = ImageComposeScene(620, 900, Density(1f), coroutineContext = Dispatchers.Swing.immediate) { Set4uApp(controller) }

@@ -81,7 +81,7 @@ internal fun WifiDetails(network: WifiNetwork, current: Map<String, String>, can
             ThemeDivider()
             val codes = p["macModes"].orEmpty().split(',').filter(String::isNotBlank)
             val labels = codes.map { t(when (it) { "0" -> "使用设备 MAC 地址"; "1" -> "使用随机 MAC 地址"; "2" -> "每次连接使用随机 MAC 地址"; else -> "自动" }) }
-            if (codes.size <= 1) ThemeRow(t("隐私"), summary = t("此设备不支持随机 MAC 地址")) { ThemeValue(labels.firstOrNull().orEmpty()) }
+            if (codes.size <= 1) ThemeRow(t("隐私")) { ThemeValue(labels.firstOrNull().orEmpty()) }
             else ThemeDropdownRow(t("隐私"), labels, codes.indexOf(p["macMode"]).coerceAtLeast(0), enabled = saved) { controller.configureWifi(network, "macMode", codes[it]) }
         }
         if (p.containsKey("metered")) {
@@ -91,7 +91,7 @@ internal fun WifiDetails(network: WifiNetwork, current: Map<String, String>, can
             }
         }
         ThemeDivider()
-        WifiNetworkSwitch("隐藏网络", "hidden", network, saved, controller)
+        WifiNetworkSwitch("隐藏网络", "hidden", network, saved, controller, summary = "即使未扫描到该WiFi也尝试连接")
         if (network.security in setOf("wpa2", "wpa3", "wep")) {
             ThemeDivider()
             ThemeRow(t("修改密码"), action = if (saved) ({ controller.editWifiPassword(network) }) else null) { ThemeValue("", true) }
@@ -100,10 +100,10 @@ internal fun WifiDetails(network: WifiNetwork, current: Map<String, String>, can
 }
 
 @Composable
-private fun WifiNetworkSwitch(title: String, key: String, network: WifiNetwork, enabled: Boolean, controller: AppController) {
+private fun WifiNetworkSwitch(title: String, key: String, network: WifiNetwork, enabled: Boolean, controller: AppController, summary: String = "") {
     val t = LocalStrings.current::text
     val value = network.properties[key]?.toBooleanStrictOrNull()
-    ThemeRow(t(title), action = if (enabled && value != null) ({ controller.configureWifi(network, key, (value != true).toString()) }) else null) {
+    ThemeRow(t(title), summary = t(summary), action = if (enabled && value != null) ({ controller.configureWifi(network, key, (value != true).toString()) }) else null) {
         ThemeSwitch(t(title), value == true, enabled && value != null) { controller.configureWifi(network, key, (value != true).toString()) }
     }
 }
